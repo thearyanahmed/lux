@@ -1,6 +1,7 @@
 mod tasks;
 mod validators;
+mod version;
 
 fn main() {
-    println!("lux validator v0.1.0");
+    println!("the version is {}", version::version());
 }
