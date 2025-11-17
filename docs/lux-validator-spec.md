@@ -13,12 +13,26 @@ A Rust-based CLI tool that validates local systems programming exercises without
 ## Core Commands
 
 ```bash
-lighthouse init <exercise> [--lang rust|go]    # Download starter code
-lighthouse test [--verbose]                     # Run validation tests
-lighthouse hints [--progressive]                # Show progressive hints
-lighthouse doctor                               # Check local environment
-lighthouse submit                               # (future) Record completion
+lux auth --token <token>                       # Authenticate with Project Lighthouse
+lux init <task-id> [--lang rust|go]            # Download starter code for a task
+lux validate --task-id <task-uuid>             # Run validation tests for a task
+lux hints --task-id <task-uuid> [--progressive] # Show progressive hints
+lux doctor                                      # Check local environment
+lux submit --task-id <task-uuid>               # (future) Record completion
 ```
+
+### Command Details
+
+**`lux auth --token <token>`**
+- Stores authentication token locally (e.g., in `~/.config/lux/auth.json`)
+- Token used for fetching tasks and submitting results
+- Required before running other commands
+
+**`lux validate --task-id <task-uuid>`**
+- Looks up task in local task registry (`tasks.json`)
+- Locates user's implementation in `exercises/<task-uuid>/<lang>/`
+- Runs task-specific validator
+- Reports test results
 
 ## Project Structure
 
