@@ -73,14 +73,86 @@ lighthouse/
 - `serde` / `serde_json` - Configuration
 - `reqwest` - Fetch templates (optional)
 
-## Validator Architecture
+## Task & Validator Architecture
 
-Each exercise implements the `Validator` trait:
+### Core Design: Static Dispatch with Enums
+
+All validators use static dispatch via enums (no `Box<dyn Trait>`). Each task UUID maps to a `Task` struct containing metadata and validators.
+
+### Task Structure
 
 ```rust
-#[async_trait]
-pub trait Validator {
-    async fn run(&self) -> Result<TestResults>;
+pub struct Task {
+    pub id: &'static str,
+    pub name: &'static str,
+    pub description: &'static str,
+    pub hints: &'static [&'static str],  // Compile-time strings
+    pub validators: Vec<Validator>,
+}
+
+impl Task {
+    pub fn description(&self) -> &'static str {
+        self.description
+    }
+
+    pub fn hints(&self) -> &'static [&'static str] {
+        self.hints
+    }
+
+    pub async fn validate(&self, context: &ValidationContext) -> Result<TestResults> {
+        let mut tests = Vec::new();
+        for validator in &self.validators {
+            tests.push(validator.validate(context).await?);
+        }
+        Ok(TestResults { tests })
+    }
+}
+```
+
+### Validator Enum (Static Dispatch)
+
+```rust
+pub enum Validator {
+    // Runtime validators (test running processes)
+    Port(PortValidator),
+    Endpoint(EndpointValidator),
+    JsonResponse(JsonResponseValidator),
+    StatusCode(StatusCodeValidator),
+    TcpEcho(TcpEchoValidator),
+
+    // Code validators (parse source files)
+    CodeStructure(CodeValidator),
+    FunctionExists(FunctionValidator),
+
+    // Infrastructure validators (future)
+    Docker(DockerValidator),
+    Kubernetes(K8sValidator),
+}
+
+impl Validator {
+    pub async fn validate(&self, context: &ValidationContext) -> Result<TestCase> {
+        match self {
+            Validator::Port(v) => v.validate(context).await,
+            Validator::Endpoint(v) => v.validate(context).await,
+            Validator::JsonResponse(v) => v.validate(context).await,
+            Validator::StatusCode(v) => v.validate(context).await,
+            Validator::TcpEcho(v) => v.validate(context).await,
+            Validator::CodeStructure(v) => v.validate(context).await,
+            Validator::FunctionExists(v) => v.validate(context).await,
+            Validator::Docker(v) => v.validate(context).await,
+            Validator::Kubernetes(v) => v.validate(context).await,
+        }
+    }
+}
+```
+
+### Validation Context & Results
+
+```rust
+pub struct ValidationContext {
+    pub task_id: String,
+    pub language: String,
+    pub project_path: PathBuf,  // e.g., exercises/<task-uuid>/rust/
 }
 
 pub struct TestResults {
@@ -90,8 +162,45 @@ pub struct TestResults {
 pub struct TestCase {
     pub name: String,
     pub passed: bool,
-    pub error: String,
+    pub error: Option<String>,
 }
+```
+
+### Task Registry (In-Memory)
+
+```rust
+use std::collections::HashMap;
+use once_cell::sync::Lazy;
+
+type TaskRegistry = HashMap<&'static str, Task>;
+
+static TASK_REGISTRY: Lazy<TaskRegistry> = Lazy::new(|| {
+    let mut registry = HashMap::new();
+
+    // HTTP Server task
+    registry.insert(
+        "550e8400-e29b-41d4-a716-446655440000",
+        Task {
+            id: "550e8400-e29b-41d4-a716-446655440000",
+            name: "HTTP Server",
+            description: "Build an HTTP server that handles JSON API requests on port 8000",
+            hints: &[
+                "Start by binding a TCP listener to port 8000",
+                "Implement the /api/v1/hello endpoint first",
+                "Return proper JSON Content-Type headers",
+                "Handle 404 errors for unknown endpoints",
+            ],
+            validators: vec![
+                Validator::Port(PortValidator::new(8000)),
+                Validator::Endpoint(EndpointValidator::new("/api/v1/hello")),
+                Validator::JsonResponse(JsonResponseValidator::new()),
+                Validator::StatusCode(StatusCodeValidator::new(404)),
+            ],
+        }
+    );
+
+    registry
+});
 ```
 
 ## Example: TCP Echo Validator
