@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use async_trait::async_trait;
 mod registry;
-
+pub use registry::get_task;
 use crate::validators::{Validator, ValidatorStep};
 
 pub mod http_server;

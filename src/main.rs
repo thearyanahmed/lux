@@ -28,7 +28,14 @@ fn main() {
 
     match cli.commands {
         Commands::Run { task_id } => {
-            println!("task id {}", task_id)
+            match tasks::get_task(&task_id) {
+                None => {
+                    println!("not found");
+                },
+                _ => {
+                    println!("probbly found something")
+                }
+            }
         }
     }
 }
