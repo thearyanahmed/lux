@@ -37,7 +37,7 @@ impl fmt::Display for Env {
 struct LighthouseAPIBaseURL(String);
 
 impl LighthouseAPIBaseURL {
-    pub fn from(base_url: &str, env: Env) -> Result<Self, String> {
+    pub fn from(base_url: &str, environment: Env) -> Result<Self, String> {
         // Regex pattern:
         // 1. localhost (http or https, any port)
         // 2. OR *.projectlighthouse.io with https only
@@ -53,8 +53,8 @@ impl LighthouseAPIBaseURL {
         }
     }
 
-    pub fn default_for_env(env: Env) -> Self {
-        let url = match env {
+    pub fn default_for_env(environment: Env) -> Self {
+        let url = match environment {
             Env::DEV => "http://localhost:8080",
             Env::RELEASE => "https://api.projectlighthouse.io",
         };
