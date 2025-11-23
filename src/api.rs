@@ -10,9 +10,9 @@ pub struct LighthouseAPI {
 }
 
 impl LighthouseAPI {
-    pub fn new(base_url: &str, api_version: &str, env: Env) -> LighthouseAPI {
+    fn new(base_url: LighthouseAPIBaseURL, api_version: &str, env: Env) -> LighthouseAPI {
         LighthouseAPI {
-            base_url: base_url.to_string(),
+            base_url: base_url.0,
             api_version: api_version.to_string(),
             env,
         }
@@ -98,7 +98,7 @@ impl Default for LighthouseAPI {
 
         log::info!("initiating lighthouse api with {}", base_url.0);
 
-        LighthouseAPI::new(&base_url.0, "v1", lux_env)
+        LighthouseAPI::new(base_url, "v1", lux_env)
     }
 }
 
