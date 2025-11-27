@@ -1,8 +1,8 @@
-use reqwest::{Client, Response, header::HeaderMap};
-use color_eyre::eyre::{ Ok, Result, eyre};
+use reqwest::{Client, header::HeaderMap};
+use color_eyre::eyre::{Result, eyre};
 use serde::{Deserialize, de::DeserializeOwned};
 use core::fmt;
-use std::{collections::HashMap, env, fmt::Result};
+use std::{collections::HashMap, env};
 
 use crate::VERSION;
 
