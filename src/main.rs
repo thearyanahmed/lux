@@ -1,4 +1,5 @@
 use clap::{arg, Parser, Subcommand};
+use color_eyre::eyre::Result;
 
 use lux::{VERSION, api};
 
@@ -18,7 +19,12 @@ enum Commands {
 
         #[arg(short = 't', long)]
         task: String,
-    }
+    },
+
+    Auth {
+        #[arg(short ='t', long)]
+        token: String,
+    },
 }
 
 
@@ -28,7 +34,8 @@ enum Commands {
 //
 // we should log as well, and maybe the user can have it as verbose log
 
-fn main() {
+fn main() -> Result<()>{
+    color_eyre::install()?;
     env_logger::init();
 
     let api = api::LighthouseAPI::default();
@@ -40,8 +47,13 @@ fn main() {
     match cli.commands {
         Commands::Run { project, task } => {
             log::info!("Running task '{}' for project '{}'", task, project);
-        }
+        },
+        Commands::Auth { token } => {
+            log::info!("Authenticating with token '{}'", token);
+        },
     }
+
+    Ok(())
 }
 
 
