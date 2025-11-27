@@ -2,7 +2,7 @@ use reqwest::{Client, header::HeaderMap};
 use color_eyre::eyre::{Result, eyre};
 use serde::{Deserialize, de::DeserializeOwned};
 use core::fmt;
-use std::{collections::HashMap, env};
+use std::{collections::HashMap, env, fmt::format};
 
 use crate::VERSION;
 
@@ -43,7 +43,7 @@ impl LighthouseAPIClient {
     // let user: User = response.json().await?;
     // The User is created with owned Strings, not borrowed data
     //
-    pub async fn get<T: DeserializeOwned>(
+    async fn get<T: DeserializeOwned>(
         &self,
         endpoint: &str,
         query_params: Option<HashMap<String,String>>,
@@ -78,20 +78,30 @@ impl LighthouseAPIClient {
 
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct ApiUser {
     pub id: i32,
     pub name: String, 
     pub email: String,
+}
+impl ApiUser {
+    pub fn id(&self) -> i32{
+        self.id
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 }
 
 impl LighthouseAPIClient {
     pub async fn me(&self, token: &str) -> Result<ApiUser>{
         let mut headers = HeaderMap::new();
         headers.insert("Authorization", format!("Bearer {}", token).parse()?);
+        headers.insert("Accept", "application/json".parse()?);
 
         Ok(
-            self.get::<ApiUser>("/user", None, Some(headers)).await?
+            self.get::<ApiUser>("user", None, Some(headers)).await?
         )
     }
 
@@ -118,8 +128,8 @@ struct LighthouseAPIClientBaseURL(String);
 impl LighthouseAPIClientBaseURL {
     pub fn from(base_url: &str, environment: Env) -> Result<Self, String> {
         let pattern = match environment {
-            // DEV: allow localhost (http or https, any port)
-            Env::DEV => r"^https?://localhost(:\d+)?(/.*)?$",
+            // DEV: allow localhost or 0.0.0.0 (http or https, any port)
+            Env::DEV => r"^https?://(localhost|0\.0\.0\.0)(:\d+)?(/.*)?$",
             // RELEASE: only allow https://*projectlighthouse.io
             Env::RELEASE => r"^https://([a-zA-Z0-9-]+\.)*projectlighthouse\.io(/.*)?$",
         };
