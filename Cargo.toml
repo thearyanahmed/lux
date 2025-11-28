@@ -18,5 +18,32 @@ reqwest = { version = "0.12", features = ["json"] }
 dirs = "5.0"
 
 [lints.clippy]
+# Prevent common mistakes
 unwrap_used = "deny"
 expect_used = "deny"
+panic = "deny"
+dbg_macro = "warn"
+
+# Code quality
+needless_return = "warn"
+redundant_clone = "warn"
+redundant_closure = "warn"
+useless_vec = "warn"
+manual_map = "warn"
+manual_filter = "warn"
+map_flatten = "warn"
+single_match = "warn"
+single_match_else = "warn"
+match_bool = "warn"
+needless_bool = "warn"
+if_same_then_else = "warn"
+collapsible_if = "warn"
+collapsible_else_if = "warn"
+
+# Dead code / unused
+unused_async = "warn"
+unused_self = "warn"
+
+[lints.rust]
+unsafe_code = "warn"
+dead_code = "warn"
