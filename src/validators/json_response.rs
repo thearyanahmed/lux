@@ -7,6 +7,12 @@ pub struct JsonResponseValidator {
     port: u16,
 }
 
+impl Default for JsonResponseValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl JsonResponseValidator {
     pub fn new() -> Self {
         Self {

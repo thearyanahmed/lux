@@ -6,7 +6,7 @@ use lux::{VERSION, api, auth::TokenAuthenticator};
 #[derive(Parser)]
 #[command(name = "lux")]
 #[command(version = VERSION)]
-struct CLI {
+struct Cli {
     #[command(subcommand)]
     commands: Commands,
 }
@@ -18,8 +18,7 @@ enum Commands {
         project: String,
 
         #[arg(short = 't', long)]
-        task: String,
-    },
+        task: String, },
 
     Auth {
         #[arg(short ='t', long)]
@@ -41,7 +40,7 @@ async fn main() -> Result<()>{
 
     let client = api::LighthouseAPIClient::default();
 
-    let cli = CLI::parse();
+    let cli = Cli::parse();
 
     match cli.commands {
         Commands::Run { project, task } => {

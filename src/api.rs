@@ -100,9 +100,7 @@ impl LighthouseAPIClient {
         headers.insert("Authorization", format!("Bearer {}", token).parse()?);
         headers.insert("Accept", "application/json".parse()?);
 
-        Ok(
-            self.get::<ApiUser>("user", None, Some(headers)).await?
-        )
+        self.get::<ApiUser>("user", None, Some(headers)).await
     }
 
 }
