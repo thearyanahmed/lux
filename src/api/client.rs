@@ -251,8 +251,6 @@ mod tests {
         result
     }
 
-    // ==================== Env Display Tests ====================
-
     #[test]
     fn test_env_display_dev() {
         assert_eq!(format!("{}", Env::DEV), "dev");
@@ -269,8 +267,6 @@ mod tests {
         let cloned = env;
         assert_eq!(format!("{}", cloned), "dev");
     }
-
-    // ==================== LighthouseAPIClientBaseURL Tests ====================
 
     #[test]
     fn test_lighthouse_api_base_url_dev_env() {
@@ -378,8 +374,6 @@ mod tests {
         assert_eq!(url.0, "https://api.projectlighthouse.io");
     }
 
-    // ==================== LighthouseAPIClient::new Tests ====================
-
     #[test]
     fn test_lighthouse_api_new() {
         let base_url = LighthouseAPIClientBaseURL::from("http://localhost:8080", Env::DEV).unwrap();
@@ -399,8 +393,6 @@ mod tests {
         assert_eq!(api.base_url, "https://api.projectlighthouse.io");
         assert_eq!(api.api_version, "v1");
     }
-
-    // ==================== LighthouseAPIClient Default Tests ====================
 
     #[test]
     fn test_lighthouse_api_default_no_env_vars() {
@@ -518,8 +510,6 @@ mod tests {
             },
         );
     }
-
-    // ==================== LighthouseAPIClient Display Tests ====================
 
     #[test]
     fn test_lighthouse_api_display() {
