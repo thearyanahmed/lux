@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{collections::HashMap, fs, path::PathBuf,path::Path};
 use color_eyre::eyre::{self, Ok};
 use secrecy::{ExposeSecret, SecretString};
 
@@ -66,7 +66,7 @@ impl Config {
         Self::exists_at_path(&path)
     }
 
-    fn exists_at_path(path: &PathBuf) -> Result<bool, eyre::Error> {
+    fn exists_at_path(path: &Path)-> Result<bool, eyre::Error> {
         Ok(path.exists())
     }
 
