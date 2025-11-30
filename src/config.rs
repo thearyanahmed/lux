@@ -25,6 +25,11 @@ impl Config {
     pub fn expose_token(&self) -> &str {
         self.token.expose_secret()
     }
+
+    // has_auth_token tries to ensure that the given token is a valid one
+    pub fn has_auth_token(&self) -> bool {
+        !self.token.expose_secret().is_empty()
+    }
 }
 
 impl Config {
