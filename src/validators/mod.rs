@@ -1,12 +1,12 @@
-pub mod port;
 pub mod endpoint;
 pub mod json_response;
+pub mod port;
 
 use crate::tasks::{TestCase, ValidationContext};
 
-pub use port::PortValidator;
 pub use endpoint::EndpointValidator;
 pub use json_response::JsonResponseValidator;
+pub use port::PortValidator;
 
 /// ValidatorStep combines a validator with metadata
 pub struct ValidatorStep {
@@ -22,7 +22,6 @@ pub enum Validator {
     Port(PortValidator),
     Endpoint(EndpointValidator),
     JsonResponse(JsonResponseValidator),
-
     // Code validators (parse source files) - TODO
     // CodeStructure(CodeValidator),
     // FunctionExists(FunctionValidator),

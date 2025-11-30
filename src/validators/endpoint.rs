@@ -42,16 +42,15 @@ impl EndpointValidator {
         let response_str = String::from_utf8_lossy(&response);
 
         // Check for 200 OK status
-        let test_result = if response_str.contains("HTTP/1.1 200")
-            || response_str.contains("HTTP/1.0 200")
-        {
-            Ok(format!("endpoint {} returned 200 ok", self.endpoint))
-        } else {
-            Err(format!(
-                "expected 200 ok, got: {}",
-                response_str.lines().next().unwrap_or("no response")
-            ))
-        };
+        let test_result =
+            if response_str.contains("HTTP/1.1 200") || response_str.contains("HTTP/1.0 200") {
+                Ok(format!("endpoint {} returned 200 ok", self.endpoint))
+            } else {
+                Err(format!(
+                    "expected 200 ok, got: {}",
+                    response_str.lines().next().unwrap_or("no response")
+                ))
+            };
 
         Ok(TestCase {
             name: format!("endpoint {} returns 200 ok", self.endpoint),

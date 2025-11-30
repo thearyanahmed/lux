@@ -1,11 +1,10 @@
-use std::{collections::HashMap, fs, path::PathBuf,path::Path};
 use color_eyre::eyre::{self, Ok};
 use secrecy::{ExposeSecret, SecretString};
+use std::{collections::HashMap, fs, path::Path, path::PathBuf};
 
 // we'll always use this path.
-static CFG_DIR : &str = ".lux";
-static CFG_FILE : &str = "cfg";
-
+static CFG_DIR: &str = ".lux";
+static CFG_FILE: &str = "cfg";
 
 #[derive(Debug)]
 pub struct Config {
@@ -13,9 +12,9 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(token : &str) -> Config {
+    pub fn new(token: &str) -> Config {
         Config {
-            token: SecretString::from(token)
+            token: SecretString::from(token),
         }
     }
 
@@ -30,8 +29,7 @@ impl Config {
 
 impl Config {
     fn config_path() -> Result<PathBuf, eyre::Error> {
-        let home = dirs::home_dir()
-            .ok_or_else(|| eyre::eyre!("could not determine home dir"))?;
+        let home = dirs::home_dir().ok_or_else(|| eyre::eyre!("could not determine home dir"))?;
 
         Ok(home.join(CFG_DIR).join(CFG_FILE))
     }
@@ -54,7 +52,8 @@ impl Config {
             })
             .collect();
 
-        let token = map.get("token")
+        let token = map
+            .get("token")
             .copied()
             .ok_or_else(|| eyre::eyre!("token not found in config"))?;
 
@@ -66,7 +65,7 @@ impl Config {
         Self::exists_at_path(&path)
     }
 
-    fn exists_at_path(path: &Path)-> Result<bool, eyre::Error> {
+    fn exists_at_path(path: &Path) -> Result<bool, eyre::Error> {
         Ok(path.exists())
     }
 

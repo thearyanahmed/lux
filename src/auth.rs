@@ -1,5 +1,8 @@
-use color_eyre::eyre::{ Ok, Result, eyre};
-use crate::{api::{ApiUser, LighthouseAPIClient}, config::Config};
+use crate::{
+    api::{ApiUser, LighthouseAPIClient},
+    config::Config,
+};
+use color_eyre::eyre::{eyre, Ok, Result};
 
 pub struct TokenAuthenticator {
     pub token: String,
@@ -7,7 +10,7 @@ pub struct TokenAuthenticator {
 }
 
 impl TokenAuthenticator {
-    pub fn new( client: LighthouseAPIClient, token: &str) -> Self {
+    pub fn new(client: LighthouseAPIClient, token: &str) -> Self {
         TokenAuthenticator {
             token: token.to_string(),
             client,
@@ -16,9 +19,9 @@ impl TokenAuthenticator {
 
     pub async fn authenticate(&self) -> Result<ApiUser> {
         // sanity checkn
-        if self.token.is_empty(){
-            // return Error invalid error 
-            return Err(eyre!("token must not be empty."))
+        if self.token.is_empty() {
+            // return Error invalid error
+            return Err(eyre!("token must not be empty."));
         }
 
         let user = self.client.me(&self.token).await?;
@@ -29,7 +32,7 @@ impl TokenAuthenticator {
 
         Ok(user)
     }
-}    
+}
 
 #[cfg(test)]
 mod tests {
@@ -45,6 +48,6 @@ mod tests {
         assert!(result.is_err());
 
         let error_msg = result.unwrap_err().to_string();
-        assert_eq!(error_msg, "token must not be empty." );
+        assert_eq!(error_msg, "token must not be empty.");
     }
 }

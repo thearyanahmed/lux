@@ -1,7 +1,7 @@
 use clap::{arg, Parser, Subcommand};
-use color_eyre::{eyre::Result};
+use color_eyre::eyre::Result;
 
-use lux::{VERSION, api, auth::TokenAuthenticator};
+use lux::{api, auth::TokenAuthenticator, VERSION};
 
 #[derive(Parser)]
 #[command(name = "lux")]
@@ -14,20 +14,27 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     Run {
-        #[arg(short ='p', long)]
+        #[arg(short = 'p', long)]
         project: String,
 
         #[arg(short = 't', long)]
-        task: String, },
+        task: String,
+    },
 
     Auth {
-        #[arg(short ='t', long)]
+        #[arg(short = 't', long)]
         token: String,
     },
 }
 
+// scratch pad:
+// lux run -p project_slug -t task_slug
+// same as: lux run --project $project_slug --task $task_slug
+//
+// we should log as well, and maybe the user can have it as verbose log
+
 #[tokio::main]
-async fn main() -> Result<()>{
+async fn main() -> Result<()> {
     color_eyre::install()?;
     env_logger::init();
 
@@ -38,23 +45,21 @@ async fn main() -> Result<()>{
     match cli.commands {
         Commands::Run { project, task } => {
             log::info!("Running task '{}' for project '{}'", task, project);
-        },
+        }
         Commands::Auth { token } => {
-            let authenticator = TokenAuthenticator::new( client, &token);
+            let authenticator = TokenAuthenticator::new(client, &token);
 
             match authenticator.authenticate().await {
                 Ok(user) => {
                     lux::message::Message::welcome_user(user.name());
-                },
+                }
                 Err(err) => {
                     log::error!("{}", err);
                     lux::message::Message::err(&err.to_string());
                 }
             }
-        },
+        }
     }
 
     Ok(())
 }
-
-

@@ -1,7 +1,7 @@
-use reqwest::{Client, header::HeaderMap};
-use color_eyre::eyre::{Result, eyre};
-use serde::{Deserialize, de::DeserializeOwned};
+use color_eyre::eyre::{eyre, Result};
 use core::fmt;
+use reqwest::{header::HeaderMap, Client};
+use serde::{de::DeserializeOwned, Deserialize};
 use std::{collections::HashMap, env};
 
 use crate::VERSION;
@@ -14,7 +14,11 @@ pub struct LighthouseAPIClient {
 }
 
 impl LighthouseAPIClient {
-    fn new(base_url: LighthouseAPIClientBaseURL, api_version: &str, env: Env) -> LighthouseAPIClient {
+    fn new(
+        base_url: LighthouseAPIClientBaseURL,
+        api_version: &str,
+        env: Env,
+    ) -> LighthouseAPIClient {
         LighthouseAPIClient {
             base_url: base_url.0,
             api_version: api_version.to_string(),
@@ -23,7 +27,6 @@ impl LighthouseAPIClient {
         }
     }
 
-    
     // when we deserialize JSON, we're creating owned data. But
     // there are two Deserialize traits:
     //
@@ -46,12 +49,12 @@ impl LighthouseAPIClient {
     async fn get<T: DeserializeOwned>(
         &self,
         endpoint: &str,
-        query_params: Option<HashMap<String,String>>,
+        query_params: Option<HashMap<String, String>>,
         headers: Option<HeaderMap>,
-    ) -> Result<T>  { // just keep bool for now 
+    ) -> Result<T> {
+        // just keep bool for now
 
-        let url = format!("{}/api/{}/{}", self.base_url,self.api_version, endpoint);
-
+        let url = format!("{}/api/{}/{}", self.base_url, self.api_version, endpoint);
 
         let mut request = self.client.get(url);
 
@@ -67,25 +70,22 @@ impl LighthouseAPIClient {
 
         if !response.status().is_success() {
             let error_text = response.text().await?;
-            return Err(eyre!("{}",error_text));
+            return Err(eyre!("{}", error_text));
         }
 
         let data = response.json::<T>().await?;
         Ok(data)
-
-
     }
-
 }
 
 #[derive(Debug, Deserialize)]
 pub struct ApiUser {
     pub id: i32,
-    pub name: String, 
+    pub name: String,
     pub email: String,
 }
 impl ApiUser {
-    pub fn id(&self) -> i32{
+    pub fn id(&self) -> i32 {
         self.id
     }
 
@@ -95,14 +95,13 @@ impl ApiUser {
 }
 
 impl LighthouseAPIClient {
-    pub async fn me(&self, token: &str) -> Result<ApiUser>{
+    pub async fn me(&self, token: &str) -> Result<ApiUser> {
         let mut headers = HeaderMap::new();
         headers.insert("Authorization", format!("Bearer {}", token).parse()?);
         headers.insert("Accept", "application/json".parse()?);
 
         self.get::<ApiUser>("user", None, Some(headers)).await
     }
-
 }
 
 #[derive(Clone, Copy)]
@@ -132,15 +131,16 @@ impl LighthouseAPIClientBaseURL {
             Env::RELEASE => r"^https://([a-zA-Z0-9-]+\.)*projectlighthouse\.io(/.*)?$",
         };
 
-        let re = regex::Regex::new(pattern)
-            .map_err(|e| format!("invalid regex pattern: {}", e))?;
+        let re = regex::Regex::new(pattern).map_err(|e| format!("invalid regex pattern: {}", e))?;
 
         if re.is_match(base_url) {
             Ok(LighthouseAPIClientBaseURL(base_url.to_string()))
         } else {
             let err_msg = match environment {
                 Env::DEV => "invalid URL: must be localhost in DEV environment",
-                Env::RELEASE => "invalid URL: must be https://*.projectlighthouse.io in RELEASE environment",
+                Env::RELEASE => {
+                    "invalid URL: must be https://*.projectlighthouse.io in RELEASE environment"
+                }
             };
             Err(err_msg.to_string())
         }
@@ -154,7 +154,6 @@ impl LighthouseAPIClientBaseURL {
         LighthouseAPIClientBaseURL(url.to_string())
     }
 }
-
 
 impl Default for LighthouseAPIClient {
     fn default() -> Self {
@@ -189,10 +188,13 @@ impl Default for LighthouseAPIClient {
     }
 }
 
-
 impl fmt::Display for LighthouseAPIClient {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f,"cli_version: {} base_url: {} api_version: {} env: {}",VERSION, self.base_url, self.api_version, self.env)
+        write!(
+            f,
+            "cli_version: {} base_url: {} api_version: {} env: {}",
+            VERSION, self.base_url, self.api_version, self.env
+        )
     }
 }
 
@@ -268,29 +270,49 @@ mod tests {
         assert!(LighthouseAPIClientBaseURL::from("https://localhost:3000/api", Env::DEV).is_ok());
 
         // projectlighthouse.io NOT allowed in DEV
-        assert!(LighthouseAPIClientBaseURL::from("https://projectlighthouse.io", Env::DEV).is_err());
-        assert!(LighthouseAPIClientBaseURL::from("https://api.projectlighthouse.io", Env::DEV).is_err());
+        assert!(
+            LighthouseAPIClientBaseURL::from("https://projectlighthouse.io", Env::DEV).is_err()
+        );
+        assert!(
+            LighthouseAPIClientBaseURL::from("https://api.projectlighthouse.io", Env::DEV).is_err()
+        );
 
         // Invalid URLs in DEV
         assert!(LighthouseAPIClientBaseURL::from("ftp://localhost", Env::DEV).is_err()); // wrong scheme
-        assert!(LighthouseAPIClientBaseURL::from("https://example.com", Env::DEV).is_err()); // wrong domain
+        assert!(LighthouseAPIClientBaseURL::from("https://example.com", Env::DEV).is_err());
+        // wrong domain
     }
 
     #[test]
     fn test_lighthouse_api_base_url_release_env() {
         // Valid projectlighthouse.io URLs in RELEASE (https only)
-        assert!(LighthouseAPIClientBaseURL::from("https://projectlighthouse.io", Env::RELEASE).is_ok());
-        assert!(LighthouseAPIClientBaseURL::from("https://projectlighthouse.io/api", Env::RELEASE).is_ok());
-        assert!(LighthouseAPIClientBaseURL::from("https://api.projectlighthouse.io", Env::RELEASE).is_ok());
-        assert!(LighthouseAPIClientBaseURL::from("https://api.projectlighthouse.io/v1", Env::RELEASE).is_ok());
+        assert!(
+            LighthouseAPIClientBaseURL::from("https://projectlighthouse.io", Env::RELEASE).is_ok()
+        );
+        assert!(
+            LighthouseAPIClientBaseURL::from("https://projectlighthouse.io/api", Env::RELEASE)
+                .is_ok()
+        );
+        assert!(
+            LighthouseAPIClientBaseURL::from("https://api.projectlighthouse.io", Env::RELEASE)
+                .is_ok()
+        );
+        assert!(LighthouseAPIClientBaseURL::from(
+            "https://api.projectlighthouse.io/v1",
+            Env::RELEASE
+        )
+        .is_ok());
 
         // localhost NOT allowed in RELEASE
         assert!(LighthouseAPIClientBaseURL::from("http://localhost", Env::RELEASE).is_err());
         assert!(LighthouseAPIClientBaseURL::from("https://localhost:8080", Env::RELEASE).is_err());
 
         // Invalid URLs in RELEASE
-        assert!(LighthouseAPIClientBaseURL::from("http://projectlighthouse.io", Env::RELEASE).is_err()); // http not allowed
-        assert!(LighthouseAPIClientBaseURL::from("https://example.com", Env::RELEASE).is_err()); // wrong domain
+        assert!(
+            LighthouseAPIClientBaseURL::from("http://projectlighthouse.io", Env::RELEASE).is_err()
+        ); // http not allowed
+        assert!(LighthouseAPIClientBaseURL::from("https://example.com", Env::RELEASE).is_err());
+        // wrong domain
     }
 
     #[test]
@@ -298,23 +320,37 @@ mod tests {
         // Various path combinations
         assert!(LighthouseAPIClientBaseURL::from("http://localhost/", Env::DEV).is_ok());
         assert!(LighthouseAPIClientBaseURL::from("http://localhost/api/v1", Env::DEV).is_ok());
-        assert!(LighthouseAPIClientBaseURL::from("http://localhost:8080/api/v1/exercises", Env::DEV).is_ok());
+        assert!(LighthouseAPIClientBaseURL::from(
+            "http://localhost:8080/api/v1/exercises",
+            Env::DEV
+        )
+        .is_ok());
     }
 
     #[test]
     fn test_lighthouse_api_base_url_release_subdomains() {
         // Multiple subdomain levels
-        assert!(LighthouseAPIClientBaseURL::from("https://api.v2.projectlighthouse.io", Env::RELEASE).is_ok());
-        assert!(LighthouseAPIClientBaseURL::from("https://staging.api.projectlighthouse.io", Env::RELEASE).is_ok());
+        assert!(LighthouseAPIClientBaseURL::from(
+            "https://api.v2.projectlighthouse.io",
+            Env::RELEASE
+        )
+        .is_ok());
+        assert!(LighthouseAPIClientBaseURL::from(
+            "https://staging.api.projectlighthouse.io",
+            Env::RELEASE
+        )
+        .is_ok());
     }
 
     #[test]
     fn test_lighthouse_api_base_url_error_messages() {
-        let dev_err = LighthouseAPIClientBaseURL::from("https://example.com", Env::DEV).unwrap_err();
+        let dev_err =
+            LighthouseAPIClientBaseURL::from("https://example.com", Env::DEV).unwrap_err();
         assert!(dev_err.contains("localhost"));
         assert!(dev_err.contains("DEV"));
 
-        let release_err = LighthouseAPIClientBaseURL::from("http://localhost", Env::RELEASE).unwrap_err();
+        let release_err =
+            LighthouseAPIClientBaseURL::from("http://localhost", Env::RELEASE).unwrap_err();
         assert!(release_err.contains("projectlighthouse.io"));
         assert!(release_err.contains("RELEASE"));
     }
@@ -344,7 +380,9 @@ mod tests {
 
     #[test]
     fn test_lighthouse_api_new_release() {
-        let base_url = LighthouseAPIClientBaseURL::from("https://api.projectlighthouse.io", Env::RELEASE).unwrap();
+        let base_url =
+            LighthouseAPIClientBaseURL::from("https://api.projectlighthouse.io", Env::RELEASE)
+                .unwrap();
         let api = LighthouseAPIClient::new(base_url, "v1", Env::RELEASE);
 
         assert_eq!(api.base_url, "https://api.projectlighthouse.io");
@@ -365,70 +403,109 @@ mod tests {
 
     #[test]
     fn test_lighthouse_api_default_release_env() {
-        with_env_vars(&[("LUX_ENV", Some("RELEASE")), ("LUX_API_BASE_URL", None)], || {
-            let api = LighthouseAPIClient::default();
-            assert_eq!(api.base_url, "https://api.projectlighthouse.io");
-            assert_eq!(api.api_version, "v1");
-        });
+        with_env_vars(
+            &[("LUX_ENV", Some("RELEASE")), ("LUX_API_BASE_URL", None)],
+            || {
+                let api = LighthouseAPIClient::default();
+                assert_eq!(api.base_url, "https://api.projectlighthouse.io");
+                assert_eq!(api.api_version, "v1");
+            },
+        );
     }
 
     #[test]
     fn test_lighthouse_api_default_release_lowercase() {
-        with_env_vars(&[("LUX_ENV", Some("release")), ("LUX_API_BASE_URL", None)], || {
-            let api = LighthouseAPIClient::default();
-            assert_eq!(api.base_url, "https://api.projectlighthouse.io");
-        });
+        with_env_vars(
+            &[("LUX_ENV", Some("release")), ("LUX_API_BASE_URL", None)],
+            || {
+                let api = LighthouseAPIClient::default();
+                assert_eq!(api.base_url, "https://api.projectlighthouse.io");
+            },
+        );
     }
 
     #[test]
     fn test_lighthouse_api_default_dev_env_explicit() {
-        with_env_vars(&[("LUX_ENV", Some("DEV")), ("LUX_API_BASE_URL", None)], || {
-            let api = LighthouseAPIClient::default();
-            assert_eq!(api.base_url, "http://localhost:8000");
-        });
+        with_env_vars(
+            &[("LUX_ENV", Some("DEV")), ("LUX_API_BASE_URL", None)],
+            || {
+                let api = LighthouseAPIClient::default();
+                assert_eq!(api.base_url, "http://localhost:8000");
+            },
+        );
     }
 
     #[test]
     fn test_lighthouse_api_default_invalid_env_defaults_to_dev() {
-        with_env_vars(&[("LUX_ENV", Some("INVALID")), ("LUX_API_BASE_URL", None)], || {
-            let api = LighthouseAPIClient::default();
-            // Invalid env should default to DEV
-            assert_eq!(api.base_url, "http://localhost:8000");
-        });
+        with_env_vars(
+            &[("LUX_ENV", Some("INVALID")), ("LUX_API_BASE_URL", None)],
+            || {
+                let api = LighthouseAPIClient::default();
+                // Invalid env should default to DEV
+                assert_eq!(api.base_url, "http://localhost:8000");
+            },
+        );
     }
 
     #[test]
     fn test_lighthouse_api_default_custom_base_url_dev() {
-        with_env_vars(&[("LUX_ENV", Some("DEV")), ("LUX_API_BASE_URL", Some("http://localhost:9000"))], || {
-            let api = LighthouseAPIClient::default();
-            assert_eq!(api.base_url, "http://localhost:9000");
-        });
+        with_env_vars(
+            &[
+                ("LUX_ENV", Some("DEV")),
+                ("LUX_API_BASE_URL", Some("http://localhost:9000")),
+            ],
+            || {
+                let api = LighthouseAPIClient::default();
+                assert_eq!(api.base_url, "http://localhost:9000");
+            },
+        );
     }
 
     #[test]
     fn test_lighthouse_api_default_custom_base_url_release() {
-        with_env_vars(&[("LUX_ENV", Some("RELEASE")), ("LUX_API_BASE_URL", Some("https://staging.projectlighthouse.io"))], || {
-            let api = LighthouseAPIClient::default();
-            assert_eq!(api.base_url, "https://staging.projectlighthouse.io");
-        });
+        with_env_vars(
+            &[
+                ("LUX_ENV", Some("RELEASE")),
+                (
+                    "LUX_API_BASE_URL",
+                    Some("https://staging.projectlighthouse.io"),
+                ),
+            ],
+            || {
+                let api = LighthouseAPIClient::default();
+                assert_eq!(api.base_url, "https://staging.projectlighthouse.io");
+            },
+        );
     }
 
     #[test]
     fn test_lighthouse_api_default_invalid_base_url_falls_back() {
-        with_env_vars(&[("LUX_ENV", Some("DEV")), ("LUX_API_BASE_URL", Some("https://invalid.com"))], || {
-            let api = LighthouseAPIClient::default();
-            // Invalid URL should fall back to DEV default
-            assert_eq!(api.base_url, "http://localhost:8000");
-        });
+        with_env_vars(
+            &[
+                ("LUX_ENV", Some("DEV")),
+                ("LUX_API_BASE_URL", Some("https://invalid.com")),
+            ],
+            || {
+                let api = LighthouseAPIClient::default();
+                // Invalid URL should fall back to DEV default
+                assert_eq!(api.base_url, "http://localhost:8000");
+            },
+        );
     }
 
     #[test]
     fn test_lighthouse_api_default_invalid_base_url_release_falls_back() {
-        with_env_vars(&[("LUX_ENV", Some("RELEASE")), ("LUX_API_BASE_URL", Some("http://localhost:8080"))], || {
-            let api = LighthouseAPIClient::default();
-            // localhost not allowed in RELEASE, should fall back to DEV default (per current logic)
-            assert_eq!(api.base_url, "http://localhost:8000");
-        });
+        with_env_vars(
+            &[
+                ("LUX_ENV", Some("RELEASE")),
+                ("LUX_API_BASE_URL", Some("http://localhost:8080")),
+            ],
+            || {
+                let api = LighthouseAPIClient::default();
+                // localhost not allowed in RELEASE, should fall back to DEV default (per current logic)
+                assert_eq!(api.base_url, "http://localhost:8000");
+            },
+        );
     }
 
     // ==================== LighthouseAPIClient Display Tests ====================
@@ -461,7 +538,9 @@ mod tests {
 
     #[test]
     fn test_lighthouse_api_display_release_env() {
-        let base_url = LighthouseAPIClientBaseURL::from("https://api.projectlighthouse.io", Env::RELEASE).unwrap();
+        let base_url =
+            LighthouseAPIClientBaseURL::from("https://api.projectlighthouse.io", Env::RELEASE)
+                .unwrap();
         let api = LighthouseAPIClient::new(base_url, "v1", Env::RELEASE);
         let display = format!("{}", api);
 
@@ -469,4 +548,3 @@ mod tests {
         assert!(display.contains("release"));
     }
 }
-

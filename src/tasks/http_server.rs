@@ -1,6 +1,8 @@
-use async_trait::async_trait;
 use super::Task;
-use crate::validators::{EndpointValidator, JsonResponseValidator, PortValidator, Validator, ValidatorStep};
+use crate::validators::{
+    EndpointValidator, JsonResponseValidator, PortValidator, Validator, ValidatorStep,
+};
+use async_trait::async_trait;
 
 pub struct HttpServerTask {
     validators: Vec<ValidatorStep>,

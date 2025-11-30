@@ -46,9 +46,10 @@ impl JsonResponseValidator {
         let response_str = String::from_utf8_lossy(&response);
 
         // Check for JSON content type
-        let has_json_header = response_str
-            .lines()
-            .any(|line| line.to_lowercase().contains("content-type") && line.to_lowercase().contains("application/json"));
+        let has_json_header = response_str.lines().any(|line| {
+            line.to_lowercase().contains("content-type")
+                && line.to_lowercase().contains("application/json")
+        });
 
         let test_result = if has_json_header {
             Ok("response has json content-type header".to_string())
