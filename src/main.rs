@@ -1,5 +1,5 @@
 use clap::{arg, Parser, Subcommand};
-use color_eyre::eyre::Result;
+use color_eyre::{eyre::Result};
 
 use lux::{VERSION, api, auth::TokenAuthenticator};
 
@@ -51,7 +51,7 @@ async fn main() -> Result<()>{
 
             match authenticator.authenticate().await {
                 Ok(user) => {
-                    log::info!("welcome {} !", user.name())
+                    lux::message::Message::welcome_user(user.name());
                 },
                 Err(err) => {
                     log::error!("{}", err)
