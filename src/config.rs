@@ -12,9 +12,9 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(token : impl Into<String>) -> Config {
+    pub fn new(token : &str) -> Config {
         Config {
-            token: SecretString::from(token.into())
+            token: SecretString::from(token)
         }
     }
 
@@ -42,7 +42,7 @@ impl Config {
             .map_err(|e| eyre::eyre!("failed to read config file:{} ,", e))?;
 
         let token = content.trim().to_string();
-        Ok(Config::new(token))
+        Ok(Config::new(&token))
     }
 
     pub fn exists() -> Result<bool, eyre::Error> {

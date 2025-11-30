@@ -1,5 +1,5 @@
 use color_eyre::eyre::{ Result, eyre};
-use crate::api::{ApiUser, LighthouseAPIClient};
+use crate::{api::{ApiUser, LighthouseAPIClient}, config::Config};
 
 pub struct TokenAuthenticator {
     pub token: String,
@@ -15,16 +15,15 @@ impl TokenAuthenticator {
     }
 
     pub async fn authenticate(&self) -> Result<ApiUser> {
-
         // sanity checkn
         if self.token.is_empty(){
             // return Error invalid error 
             return Err(eyre!("token must not be empty."))
         }
 
-        // it will make an api call, that can return 
-        // store it it in ~/.lux/cfg
-        // return a simple user adta, that the caller will use to display `welcome $username`
+        let cfg = Config::new(&self.token);
+        
+        cfg.save()?;
 
         match self.client.me(&self.token).await {
             Ok(user) => Ok(user), 
