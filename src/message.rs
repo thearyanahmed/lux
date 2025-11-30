@@ -7,4 +7,10 @@ impl Message {
         let msg = format!("hello {}, welcome to {}!", name.bold(), "projectlighthouse".yellow());
         println!("{}", msg);
     }
+
+    pub fn err(err: &str) {
+        let msg = err.red();
+        println!("{}", msg);
+
+    }
 }

@@ -54,7 +54,8 @@ async fn main() -> Result<()>{
                     lux::message::Message::welcome_user(user.name());
                 },
                 Err(err) => {
-                    log::error!("{}", err)
+                    log::error!("{}", err);
+                    lux::message::Message::err(&err.to_string());
                 }
             }
         },
