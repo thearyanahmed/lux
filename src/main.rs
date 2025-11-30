@@ -26,13 +26,6 @@ enum Commands {
     },
 }
 
-
-// scratch pad:
-// lux run -p project_slug -t task_slug 
-// same as: lux run --project $project_slug --task $task_slug
-//
-// we should log as well, and maybe the user can have it as verbose log
-
 #[tokio::main]
 async fn main() -> Result<()>{
     color_eyre::install()?;

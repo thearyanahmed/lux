@@ -1,4 +1,35 @@
-.PHONY: build run test fmt lint clean dev check all
+.PHONY: build run test fmt lint clean dev check all local\:me local\:get
+
+# ==============================================================================
+# Local API Testing
+# ==============================================================================
+
+LOCAL_API_URL := http://0.0.0.0:8000/api/v1
+DEV_TOKEN_FILE := dev_token
+DEV_TOKEN := $(shell cat $(DEV_TOKEN_FILE) 2>/dev/null)
+
+# Base function for authenticated GET requests
+define api_get
+	@if [ -z "$(DEV_TOKEN)" ]; then \
+		echo "Error: dev_token file not found or empty. See README.md for setup."; \
+		exit 1; \
+	fi
+	@curl -s -H "Authorization: Bearer $(DEV_TOKEN)" \
+		-H "Accept: application/json" \
+		"$(LOCAL_API_URL)$(1)" | jq
+endef
+
+# Get current user info
+local\:me:
+	$(call api_get,/user)
+
+# Generic GET request: make local:get ENDPOINT=/some/path
+local\:get:
+	$(call api_get,$(ENDPOINT))
+
+# ==============================================================================
+# Build & Development
+# ==============================================================================
 
 # Build debug binary
 build:
