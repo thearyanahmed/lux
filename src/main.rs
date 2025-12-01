@@ -1,7 +1,7 @@
 use clap::{arg, Parser, Subcommand};
 use color_eyre::eyre::Result;
 
-use lux::{VERSION, auth::TokenAuthenticator, config::Config, greet, oops};
+use lux::{VERSION, api::LighthouseAPIClient, auth::TokenAuthenticator, config::Config, greet, message::Message, oops};
 
 #[derive(Parser)]
 #[command(name = "lux")]
@@ -61,8 +61,18 @@ async fn main() -> Result<()> {
                 oops!("not authenticated. Run: `{}`", Commands::AUTH_USAGE);
                 return Ok(());
             }
-            log::debug!("projects called")
-        },
+
+            let client = LighthouseAPIClient::from_config(&config);
+
+            match client.projects(None).await {
+                Ok(response) => {
+                    Message::print_projects(&response);
+                }
+                Err(err) => {
+                    oops!("failed to fetch projects: {}", err);
+                }
+            }
+        }
         Commands::Run { project, task } => {
             log::info!("Running task '{}' for project '{}'", task, project);
         },
