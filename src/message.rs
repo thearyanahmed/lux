@@ -43,9 +43,26 @@ impl Message {
 
     fn print_project(project: &Project) {
         println!("  {} {}", "[#]".dimmed(), project.name.bold());
-        println!("    {}", project.short_description);
-        println!("    {} {}  {} {}", "slug:".dimmed(), project.slug.dimmed(), "tasks:".dimmed(), project.tasks_count.to_string().dimmed());
+        if let Some(desc) = &project.short_description {
+            println!("    {}", desc);
+        }
+        let tasks_count = project.tasks_count.unwrap_or(0);
+        println!("    {} {}  {} {}", "slug:".dimmed(), project.slug.dimmed(), "tasks:".dimmed(), tasks_count.to_string().dimmed());
         println!("    {} {}\n", "url:".dimmed(), project.url().dimmed());
+    }
+
+    pub fn print_project_detail(project: &Project) {
+        println!("  {} {}", "[#]".dimmed(), project.name.bold());
+        println!("    {} {}", "slug:".dimmed(), project.slug.dimmed());
+        println!("    {} {}\n", "url:".dimmed(), project.url().dimmed());
+
+        if let Some(tasks) = &project.tasks {
+            println!("  {} ({}):\n", "tasks".bold(), tasks.len());
+            for task in tasks {
+                println!("    {} {}", format!("{}.", task.sort_order).dimmed(), task.title);
+                println!("      {} {}\n", "status:".dimmed(), task.status.dimmed());
+            }
+        }
     }
 }
 

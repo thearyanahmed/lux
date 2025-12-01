@@ -27,6 +27,8 @@ enum Commands {
     },
 
     Projects {
+        #[arg(short = 's', long)]
+        slug: Option<String>,
     }
 }
 
@@ -55,7 +57,7 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        Commands::Projects {} => {
+        Commands::Projects { slug } => {
             let config = Config::load()?;
             if !config.has_auth_token() {
                 oops!("not authenticated. Run: `{}`", Commands::AUTH_USAGE);
@@ -64,12 +66,26 @@ async fn main() -> Result<()> {
 
             let client = LighthouseAPIClient::from_config(&config);
 
-            match client.projects(None, None).await {
-                Ok(response) => {
-                    Message::print_projects(&response);
+            match slug {
+                Some(slug) => {
+                    match client.project_by_slug(&slug).await {
+                        Ok(project) => {
+                            Message::print_project_detail(&project);
+                        }
+                        Err(err) => {
+                            oops!("failed to fetch project: {}", err);
+                        }
+                    }
                 }
-                Err(err) => {
-                    oops!("failed to fetch projects: {}", err);
+                None => {
+                    match client.projects(None, None).await {
+                        Ok(response) => {
+                            Message::print_projects(&response);
+                        }
+                        Err(err) => {
+                            oops!("failed to fetch projects: {}", err);
+                        }
+                    }
                 }
             }
         }

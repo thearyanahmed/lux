@@ -7,7 +7,7 @@ use std::{collections::HashMap, env};
 
 use crate::{config::Config, VERSION};
 
-use super::types::{ApiUser, PaginatedResponse, Project};
+use super::types::{ApiError, ApiUser, PaginatedResponse, Project};
 
 pub struct LighthouseAPIClient {
     pub base_url: String,
@@ -95,7 +95,10 @@ impl LighthouseAPIClient {
 
         if !response.status().is_success() {
             let error_text = response.text().await?;
-            return Err(eyre!("{}", error_text));
+            let message = serde_json::from_str::<ApiError>(&error_text)
+                .map(|e| e.message)
+                .unwrap_or(error_text);
+            return Err(eyre!("{}", message));
         }
 
         let data = response.json::<T>().await?;
@@ -120,6 +123,12 @@ impl LighthouseAPIClient {
 
         self.get::<PaginatedResponse<Project>>("projects", Some(query_params), Some(headers))
             .await
+    }
+
+    pub async fn project_by_slug(&self, slug: &str) -> Result<Project> {
+        let headers = self.auth_headers()?;
+        let endpoint = format!("projects/{}", slug);
+        self.get::<Project>(&endpoint, None, Some(headers)).await
     }
 }
 
