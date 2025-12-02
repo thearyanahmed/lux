@@ -80,19 +80,58 @@ impl Message {
 
         if let Some(tasks) = &project.tasks {
             println!("  {} ({}):\n", "tasks".bold(), tasks.len());
-            let skin = MadSkin::default();
-            for task in tasks {
+
+            let task_count = tasks.len();
+            for (index, task) in tasks.iter().enumerate() {
+                let is_last = index == task_count - 1;
+
+                // Timeline connector
+                let connector = if is_last { "└" } else { "├" };
+                let line_char = if is_last { " " } else { "│" };
+
                 println!(
-                    "    {} {}",
-                    format!("{}.", task.sort_order).dimmed(),
-                    task.title
+                    "    {}── {}",
+                    connector.dimmed(),
+                    task.title.bold()
                 );
-                // Render markdown description with indentation
-                let rendered = format!("{}", skin.text(&task.description, None));
-                for line in rendered.lines() {
-                    println!("      {}", line);
+
+                // Show points, and status only if completed
+                let is_completed = task.status == "completed" || task.status == "success";
+                if is_completed {
+                    println!(
+                        "    {}   {} {}  {} {}",
+                        line_char.dimmed(),
+                        "points:".dimmed(),
+                        task.scores.dimmed(),
+                        "status:".dimmed(),
+                        task.status.green()
+                    );
+                } else {
+                    println!(
+                        "    {}   {} {}",
+                        line_char.dimmed(),
+                        "points:".dimmed(),
+                        task.scores.dimmed()
+                    );
                 }
-                println!("      {} {}\n", "status:".dimmed(), task.status.dimmed());
+
+                // Add empty line between tasks (except after last)
+                if !is_last {
+                    println!("    {}", line_char.dimmed());
+                }
+            }
+
+            // Show first task details at the end
+            if let Some(first_task) = tasks.first() {
+                println!();
+                println!("  {} {}", "next up:".dimmed(), first_task.title.bold());
+                println!();
+
+                let skin = MadSkin::default();
+                let rendered = format!("{}", skin.text(&first_task.description, None));
+                for line in rendered.lines() {
+                    println!("    {}", line);
+                }
             }
         }
     }
