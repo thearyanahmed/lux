@@ -27,7 +27,12 @@ impl Message {
     }
 
     pub fn complain(msg: &str) {
-        eprintln!("{:>WIDTH$} {}", "[WARN]".yellow(), msg, WIDTH = PREFIX_WIDTH);
+        eprintln!(
+            "{:>WIDTH$} {}",
+            "[WARN]".yellow(),
+            msg,
+            WIDTH = PREFIX_WIDTH
+        );
     }
 
     pub fn oops(msg: &str) {
@@ -35,7 +40,10 @@ impl Message {
     }
 
     pub fn print_projects(response: &PaginatedResponse<Project>) {
-        Self::say(&format!("available projects ({} total):\n", response.meta.total));
+        Self::say(&format!(
+            "available projects ({} total):\n",
+            response.meta.total
+        ));
 
         for project in &response.data {
             Self::print_project(project);
@@ -48,7 +56,13 @@ impl Message {
             println!("    {}", desc);
         }
         let tasks_count = project.tasks_count.unwrap_or(0);
-        println!("    {} {}  {} {}", "slug:".dimmed(), project.slug.dimmed(), "tasks:".dimmed(), tasks_count.to_string().dimmed());
+        println!(
+            "    {} {}  {} {}",
+            "slug:".dimmed(),
+            project.slug.dimmed(),
+            "tasks:".dimmed(),
+            tasks_count.to_string().dimmed()
+        );
         println!("    {} {}\n", "url:".dimmed(), project.url().dimmed());
     }
 
@@ -68,7 +82,11 @@ impl Message {
             println!("  {} ({}):\n", "tasks".bold(), tasks.len());
             let skin = MadSkin::default();
             for task in tasks {
-                println!("    {} {}", format!("{}.", task.sort_order).dimmed(), task.title);
+                println!(
+                    "    {} {}",
+                    format!("{}.", task.sort_order).dimmed(),
+                    task.title
+                );
                 // Render markdown description with indentation
                 let rendered = format!("{}", skin.text(&task.description, None));
                 for line in rendered.lines() {

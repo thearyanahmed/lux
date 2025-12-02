@@ -112,7 +112,11 @@ impl LighthouseAPIClient {
         self.get::<ApiUser>("user", None, Some(headers)).await
     }
 
-    pub async fn projects(&self, page: Option<i32>, per_page: Option<i32>) -> Result<PaginatedResponse<Project>> {
+    pub async fn projects(
+        &self,
+        page: Option<i32>,
+        per_page: Option<i32>,
+    ) -> Result<PaginatedResponse<Project>> {
         let headers = self.auth_headers()?;
 
         let mut query_params = HashMap::new();
@@ -159,8 +163,7 @@ impl LighthouseAPIClientBaseURL {
             Env::RELEASE => r"^https://([a-zA-Z0-9-]+\.)*projectlighthouse\.io(/.*)?$",
         };
 
-        let re =
-            regex::Regex::new(pattern).map_err(|e| format!("invalid regex pattern: {}", e))?;
+        let re = regex::Regex::new(pattern).map_err(|e| format!("invalid regex pattern: {}", e))?;
 
         if re.is_match(base_url) {
             Ok(LighthouseAPIClientBaseURL(base_url.to_string()))

@@ -40,7 +40,7 @@ impl EndpointValidator {
             .map_err(|e| format!("failed to read response: {}", e))?;
 
         let response_str = String::from_utf8_lossy(&response);
-       // Check for 200 OK status
+        // Check for 200 OK status
         let test_result =
             if response_str.contains("HTTP/1.1 200") || response_str.contains("HTTP/1.0 200") {
                 Ok(format!("endpoint {} returned 200 ok", self.endpoint))
