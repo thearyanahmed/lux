@@ -13,7 +13,7 @@ impl TokenAuthenticator {
         TokenAuthenticator {
             token: token.to_string(),
         }
-    
+    }
 
     pub async fn authenticate(&self) -> Result<ApiUser> {
         if self.token.is_empty() {
