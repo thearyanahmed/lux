@@ -45,11 +45,17 @@ impl Message {
     }
 
     fn print_lab(lab: &Lab, index: usize) {
-        println!("  {} {}", format!("{}.", index).dimmed(), lab.name.bold());
+        println!(
+            "  {} {} {}",
+            format!("{}.", index).dimmed(),
+            lab.name.bold(),
+            format!("/{}", lab.slug).dimmed()
+        );
         if let Some(desc) = &lab.short_description {
-            println!("    {}", desc);
+            println!("    {}\n", desc);
+        } else {
+            println!();
         }
-        println!("    {} {}\n", "slug:".dimmed(), lab.slug.dimmed());
     }
 
     pub fn print_lab_detail(lab: &Lab) {
