@@ -294,6 +294,19 @@ pub struct SubmitAnswerResponse {
     pub already_completed: Option<bool>,
 }
 
+/// response from restarting a lab
+#[derive(Debug, Deserialize)]
+pub struct RestartLabResponse {
+    pub message: String,
+    pub data: RestartLabData,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RestartLabData {
+    pub attempt_group_id: i32,
+    pub created_at: String,
+}
+
 impl ApiUser {
     pub fn id(&self) -> i32 {
         self.id
