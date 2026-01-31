@@ -83,6 +83,7 @@ enum LabAction {
     },
     /// Begin working on a lab in your current directory
     Start {
+        /// Lab slug or index from `lab list`
         #[arg(short = 'i', long)]
         id: String,
 
