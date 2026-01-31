@@ -1,3 +1,4 @@
+use super::benchmark::{BenchmarkValidator, OutputMatchValidator};
 use super::compile::CanCompileValidator;
 use super::docker::{DockerValidator, Expectation};
 use super::file::FileContentsMatchValidator;
@@ -33,6 +34,8 @@ pub enum RuntimeValidator {
     HttpGetCompressed(HttpGetCompressedValidator),
     FileContentsMatch(FileContentsMatchValidator),
     CanCompile(CanCompileValidator),
+    OutputMatch(OutputMatchValidator),
+    Benchmark(BenchmarkValidator),
     // http validators
     HttpJsonExists(HttpJsonExistsValidator),
     HttpJsonField(HttpJsonFieldValidator),
@@ -81,6 +84,8 @@ impl RuntimeValidator {
             RuntimeValidator::HttpGetCompressed(v) => v.validate().await,
             RuntimeValidator::FileContentsMatch(v) => v.validate().await,
             RuntimeValidator::CanCompile(v) => v.validate().await,
+            RuntimeValidator::OutputMatch(v) => v.validate().await,
+            RuntimeValidator::Benchmark(v) => v.validate().await,
             RuntimeValidator::HttpJsonExists(v) => v.validate().await,
             RuntimeValidator::HttpJsonField(v) => v.validate().await,
             RuntimeValidator::HttpPostJson(v) => v.validate().await,
@@ -129,6 +134,8 @@ impl RuntimeValidator {
             RuntimeValidator::HttpGetCompressed(_) => "http_get_compressed",
             RuntimeValidator::FileContentsMatch(_) => "file_contents_match",
             RuntimeValidator::CanCompile(_) => "can_compile",
+            RuntimeValidator::OutputMatch(_) => "output_match",
+            RuntimeValidator::Benchmark(_) => "benchmark",
             RuntimeValidator::HttpJsonExists(_) => "http_json_exists",
             RuntimeValidator::HttpJsonField(_) => "http_json_field",
             RuntimeValidator::HttpPostJson(_) => "http_post_json",
@@ -179,6 +186,8 @@ fn create_from_parsed(parsed: &ParsedValidator) -> Result<RuntimeValidator, Stri
         "concurrent_requests" => create_concurrent_requests(parsed),
         "http_post_file" => create_http_post_file(parsed),
         "can_compile" => create_can_compile(parsed),
+        "output_match" => create_output_match(parsed),
+        "benchmark" => create_benchmark(parsed),
         "http_get_file" => create_http_get_file(parsed),
         "http_get_compressed" => create_http_get_compressed(parsed),
         "file_contents_match" => create_file_contents_match(parsed),
@@ -337,6 +346,28 @@ fn create_can_compile(parsed: &ParsedValidator) -> Result<RuntimeValidator, Stri
     let expected_success = parsed.param_as_bool(0)?;
     Ok(RuntimeValidator::CanCompile(CanCompileValidator::new(
         expected_success,
+    )))
+}
+
+// output_match:string(./solution /data/measurements_10k.txt),string(/expected/10k.txt)
+fn create_output_match(parsed: &ParsedValidator) -> Result<RuntimeValidator, String> {
+    let command = parsed.param_as_string(0)?;
+    let expected_file = parsed.param_as_string(1)?;
+    Ok(RuntimeValidator::OutputMatch(OutputMatchValidator::new(
+        command,
+        expected_file,
+    )))
+}
+
+// benchmark:string(./solution /data/measurements_1m.txt),string(/expected/1m.txt),int(10000)
+fn create_benchmark(parsed: &ParsedValidator) -> Result<RuntimeValidator, String> {
+    let command = parsed.param_as_string(0)?;
+    let expected_file = parsed.param_as_string(1)?;
+    let max_time_ms = parsed.param_as_int(2)? as u64;
+    Ok(RuntimeValidator::Benchmark(BenchmarkValidator::new(
+        command,
+        expected_file,
+        max_time_ms,
     )))
 }
 
@@ -1185,5 +1216,23 @@ mod tests {
         let validator =
             create_validator("http_file_verify:string(upload.txt),string(test data)").unwrap();
         assert_eq!(validator.name(), "http_get");
+    }
+
+    #[test]
+    fn test_create_output_match() {
+        let validator = create_validator(
+            "output_match:string(./solution /data/measurements_10k.txt),string(/expected/10k.txt)",
+        )
+        .unwrap();
+        assert_eq!(validator.name(), "output_match");
+    }
+
+    #[test]
+    fn test_create_benchmark() {
+        let validator = create_validator(
+            "benchmark:string(./solution /data/measurements_1m.txt),string(/expected/1m.txt),int(10000)",
+        )
+        .unwrap();
+        assert_eq!(validator.name(), "benchmark");
     }
 }
