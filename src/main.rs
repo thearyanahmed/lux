@@ -66,6 +66,24 @@ enum Commands {
 
     /// Check your environment and diagnose issues
     Doctor,
+
+    /// Project-specific helper tools (e.g., data generators)
+    Helper {
+        /// Helper name (e.g., 1brc)
+        name: String,
+
+        /// Number of rows to generate
+        #[arg(short = 'r', long, default_value = "10000")]
+        rows: u64,
+
+        /// Measurements output file
+        #[arg(short = 'm', long, default_value = "data/measurements.txt")]
+        measurements: String,
+
+        /// Expected output file
+        #[arg(short = 'e', long, default_value = "expected/output.txt")]
+        expected: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -323,6 +341,15 @@ async fn main() -> Result<()> {
 
         Commands::Doctor => {
             commands::doctor::run().await?;
+        }
+
+        Commands::Helper {
+            name,
+            rows,
+            measurements,
+            expected,
+        } => {
+            commands::helpers::run(&name, rows, &measurements, &expected)?;
         }
     }
 
