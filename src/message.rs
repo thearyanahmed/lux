@@ -39,18 +39,13 @@ impl Message {
     }
 
     pub fn print_labs(response: &PaginatedResponse<Lab>) {
-        Self::say(&format!(
-            "available labs ({} total):\n",
-            response.meta.total
-        ));
-
-        for lab in &response.data {
-            Self::print_lab(lab);
+        for (i, lab) in response.data.iter().enumerate() {
+            Self::print_lab(lab, i);
         }
     }
 
-    fn print_lab(lab: &Lab) {
-        println!("  {} {}", "#".dimmed(), lab.name.bold());
+    fn print_lab(lab: &Lab, index: usize) {
+        println!("  {} {}", format!("{}.", index).dimmed(), lab.name.bold());
         if let Some(desc) = &lab.short_description {
             println!("    {}", desc);
         }
