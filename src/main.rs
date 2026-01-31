@@ -83,8 +83,8 @@ enum LabAction {
     },
     /// Begin working on a lab in your current directory
     Start {
-        #[arg(short = 's', long)]
-        slug: String,
+        #[arg(short = 'i', long)]
+        id: String,
 
         /// Workspace directory (defaults to current directory)
         #[arg(short = 'w', long, default_value = ".")]
@@ -238,11 +238,11 @@ async fn main() -> Result<()> {
                 }
             }
             LabAction::Start {
-                slug,
+                id,
                 workspace,
                 runtime,
             } => {
-                let actual_slug = if let Ok(index) = slug.parse::<usize>() {
+                let actual_slug = if let Ok(index) = id.parse::<usize>() {
                     let config = Config::load()?;
                     if !config.has_auth_token() {
                         oops!("not authenticated. Run: `{}`", Commands::AUTH_USAGE);
@@ -264,7 +264,7 @@ async fn main() -> Result<()> {
                         }
                     }
                 } else {
-                    slug
+                    id
                 };
                 commands::lab::start(&actual_slug, &workspace, runtime.as_deref()).await?;
             }
