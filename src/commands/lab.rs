@@ -56,7 +56,7 @@ pub async fn start(slug: &str, workspace: &str, runtime: Option<&str>) -> Result
     if let Some(rt) = runtime {
         UI::kv("runtime", rt);
     }
-    UI::note("run `luxctl tasks` to see available tasks");
+    UI::note("run `luxctl task list` to see available tasks");
 
     Ok(())
 }
@@ -92,7 +92,7 @@ pub fn status() -> Result<()> {
             ),
             14,
         );
-        UI::note("run `luxctl tasks` for task list");
+        UI::note("run `luxctl task list` for task list");
     } else {
         UI::info("no active lab");
         UI::note("run `luxctl lab start --id <ID>` to start one");

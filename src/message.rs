@@ -186,7 +186,7 @@ impl Message {
         println!("tasks for: {}\n", lab.name.bold());
 
         println!(
-            "  {}  {}  {}  {}",
+            "{}  {}  {}  {}",
             "#".dimmed(),
             format!("{:>6}", "Points").dimmed(),
             "Status".dimmed(),
@@ -213,7 +213,7 @@ impl Message {
             let index = format!("{:02}", i + 1);
             let points = format!("{:>6}", task.points);
             println!(
-                "  {}  {}  {}  {}",
+                "{}  {}  {}  {}",
                 index.dimmed(),
                 points.bold(),
                 status_display,
@@ -223,7 +223,7 @@ impl Message {
 
         println!();
         println!(
-            "  progress: {}/{} completed | {} XP earned",
+            "progress: {}/{} completed | {} XP earned",
             lab.completed_count().to_string().bold(),
             lab.tasks.len(),
             format!("{}/{}", lab.earned_points(), lab.total_points()).bold()
