@@ -49,15 +49,7 @@ impl Message {
         if let Some(desc) = &lab.short_description {
             println!("    {}", desc);
         }
-        let tasks_count = lab.tasks_count.unwrap_or(0);
-        println!(
-            "    {} {}  {} {}",
-            "slug:".dimmed(),
-            lab.slug.dimmed(),
-            "tasks:".dimmed(),
-            tasks_count.to_string().dimmed()
-        );
-        println!("    {} {}\n", "url:".dimmed(), lab.url().dimmed());
+        println!("    {} {}\n", "slug:".dimmed(), lab.slug.dimmed());
     }
 
     pub fn print_lab_detail(lab: &Lab) {
