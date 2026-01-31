@@ -182,19 +182,8 @@ async fn main() -> Result<()> {
 
             let client = LighthouseAPIClient::from_config(&config);
             match client.me().await {
-                Ok(user) => {
-                    println!("{}", user.name);
-                    println!("{}", user.email);
-                    if let Some(stats) = user.stats {
-                        println!();
-                        println!("projects: {}", stats.projects_attempted);
-                        println!("tasks completed: {}", stats.tasks_completed);
-                        println!("total xp: {}", stats.total_xp);
-                    }
-                }
-                Err(err) => {
-                    oops!("failed to fetch user: {}", err);
-                }
+                Ok(user) => println!("{}", user.name),
+                Err(err) => oops!("failed to fetch user: {}", err),
             }
         }
 
