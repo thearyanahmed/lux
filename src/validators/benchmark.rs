@@ -217,6 +217,231 @@ impl BenchmarkValidator {
     }
 }
 
+/// Validator: run 1BRC solution and compute expected output on-the-fly
+/// DSL: brc_validate:string(./solution),string(data/measurements.txt)
+pub struct BrcValidator {
+    pub solution: String,
+    pub measurements_file: String,
+}
+
+impl BrcValidator {
+    pub fn new(solution: impl Into<String>, measurements_file: impl Into<String>) -> Self {
+        Self {
+            solution: solution.into(),
+            measurements_file: measurements_file.into(),
+        }
+    }
+
+    pub async fn validate(&self) -> Result<TestCase, String> {
+        use std::collections::BTreeMap;
+        use std::io::{BufRead, BufReader};
+
+        let workspace = get_workspace();
+
+        // build the command: ./solution <measurements_file>
+        let cmd = format!("{} {}", self.solution, self.measurements_file);
+
+        // run user's solution
+        let (stdout, _stderr, elapsed_ms) = run_command(&cmd, &workspace).await?;
+
+        // compute expected output by reading measurements file
+        let measurements_path = if self.measurements_file.starts_with('/') {
+            PathBuf::from(&self.measurements_file)
+        } else {
+            workspace.join(&self.measurements_file)
+        };
+
+        let file = std::fs::File::open(&measurements_path)
+            .map_err(|e| format!("failed to open {}: {}", measurements_path.display(), e))?;
+
+        struct Stats {
+            min: f64,
+            max: f64,
+            sum: f64,
+            count: u64,
+        }
+
+        let mut stats: BTreeMap<String, Stats> = BTreeMap::new();
+        let reader = BufReader::new(file);
+
+        for line in reader.lines() {
+            let line = line.map_err(|e| format!("read error: {}", e))?;
+            if let Some(pos) = line.rfind(';') {
+                let name = &line[..pos];
+                let temp_str = &line[pos + 1..];
+                if let Ok(temp) = temp_str.parse::<f64>() {
+                    stats
+                        .entry(name.to_string())
+                        .and_modify(|s| {
+                            if temp < s.min {
+                                s.min = temp;
+                            }
+                            if temp > s.max {
+                                s.max = temp;
+                            }
+                            s.sum += temp;
+                            s.count += 1;
+                        })
+                        .or_insert(Stats {
+                            min: temp,
+                            max: temp,
+                            sum: temp,
+                            count: 1,
+                        });
+                }
+            }
+        }
+
+        // format expected output
+        let mut expected = String::from("{");
+        let mut first = true;
+        for (name, s) in &stats {
+            if !first {
+                expected.push_str(", ");
+            }
+            first = false;
+            let mean = s.sum / s.count as f64;
+            expected.push_str(&format!("{}={:.1}/{:.1}/{:.1}", name, s.min, mean, s.max));
+        }
+        expected.push('}');
+
+        let actual = normalize(&stdout);
+        let expected = normalize(&expected);
+
+        let result = if actual == expected {
+            Ok(format!("output correct ({}ms)", elapsed_ms))
+        } else {
+            Err(format!("output mismatch: {}", diff_preview(&actual, &expected)))
+        };
+
+        Ok(TestCase {
+            name: format!("brc validate {}", self.measurements_file),
+            result,
+        })
+    }
+}
+
+/// Validator: run 1BRC solution, validate correctness, and check time limit
+/// DSL: brc_benchmark:string(./solution),string(data/measurements.txt),int(max_ms)
+pub struct BrcBenchmarkValidator {
+    pub solution: String,
+    pub measurements_file: String,
+    pub max_time_ms: u64,
+}
+
+impl BrcBenchmarkValidator {
+    pub fn new(
+        solution: impl Into<String>,
+        measurements_file: impl Into<String>,
+        max_time_ms: u64,
+    ) -> Self {
+        Self {
+            solution: solution.into(),
+            measurements_file: measurements_file.into(),
+            max_time_ms,
+        }
+    }
+
+    pub async fn validate(&self) -> Result<TestCase, String> {
+        use std::collections::BTreeMap;
+        use std::io::{BufRead, BufReader};
+
+        let workspace = get_workspace();
+
+        let cmd = format!("{} {}", self.solution, self.measurements_file);
+        let (stdout, _stderr, elapsed_ms) = run_command(&cmd, &workspace).await?;
+
+        // compute expected
+        let measurements_path = if self.measurements_file.starts_with('/') {
+            PathBuf::from(&self.measurements_file)
+        } else {
+            workspace.join(&self.measurements_file)
+        };
+
+        let file = std::fs::File::open(&measurements_path)
+            .map_err(|e| format!("failed to open {}: {}", measurements_path.display(), e))?;
+
+        struct Stats {
+            min: f64,
+            max: f64,
+            sum: f64,
+            count: u64,
+        }
+
+        let mut stats: BTreeMap<String, Stats> = BTreeMap::new();
+        let reader = BufReader::new(file);
+
+        for line in reader.lines() {
+            let line = line.map_err(|e| format!("read error: {}", e))?;
+            if let Some(pos) = line.rfind(';') {
+                let name = &line[..pos];
+                let temp_str = &line[pos + 1..];
+                if let Ok(temp) = temp_str.parse::<f64>() {
+                    stats
+                        .entry(name.to_string())
+                        .and_modify(|s| {
+                            if temp < s.min {
+                                s.min = temp;
+                            }
+                            if temp > s.max {
+                                s.max = temp;
+                            }
+                            s.sum += temp;
+                            s.count += 1;
+                        })
+                        .or_insert(Stats {
+                            min: temp,
+                            max: temp,
+                            sum: temp,
+                            count: 1,
+                        });
+                }
+            }
+        }
+
+        let mut expected = String::from("{");
+        let mut first = true;
+        for (name, s) in &stats {
+            if !first {
+                expected.push_str(", ");
+            }
+            first = false;
+            let mean = s.sum / s.count as f64;
+            expected.push_str(&format!("{}={:.1}/{:.1}/{:.1}", name, s.min, mean, s.max));
+        }
+        expected.push('}');
+
+        let actual = normalize(&stdout);
+        let expected = normalize(&expected);
+
+        // check correctness first
+        if actual != expected {
+            return Ok(TestCase {
+                name: format!("brc benchmark < {}ms", self.max_time_ms),
+                result: Err(format!("output mismatch: {}", diff_preview(&actual, &expected))),
+            });
+        }
+
+        // then check timing
+        let result = if elapsed_ms <= self.max_time_ms {
+            Ok(format!(
+                "completed in {}ms (limit: {}ms)",
+                elapsed_ms, self.max_time_ms
+            ))
+        } else {
+            Err(format!(
+                "too slow: {}ms (limit: {}ms)",
+                elapsed_ms, self.max_time_ms
+            ))
+        };
+
+        Ok(TestCase {
+            name: format!("brc benchmark < {}ms", self.max_time_ms),
+            result,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

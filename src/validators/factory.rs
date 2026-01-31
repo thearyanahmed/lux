@@ -1,4 +1,4 @@
-use super::benchmark::{BenchmarkValidator, OutputMatchValidator};
+use super::benchmark::{BenchmarkValidator, BrcBenchmarkValidator, BrcValidator, OutputMatchValidator};
 use super::compile::CanCompileValidator;
 use super::docker::{DockerValidator, Expectation};
 use super::file::FileContentsMatchValidator;
@@ -36,6 +36,8 @@ pub enum RuntimeValidator {
     CanCompile(CanCompileValidator),
     OutputMatch(OutputMatchValidator),
     Benchmark(BenchmarkValidator),
+    BrcValidate(BrcValidator),
+    BrcBenchmark(BrcBenchmarkValidator),
     // http validators
     HttpJsonExists(HttpJsonExistsValidator),
     HttpJsonField(HttpJsonFieldValidator),
@@ -86,6 +88,8 @@ impl RuntimeValidator {
             RuntimeValidator::CanCompile(v) => v.validate().await,
             RuntimeValidator::OutputMatch(v) => v.validate().await,
             RuntimeValidator::Benchmark(v) => v.validate().await,
+            RuntimeValidator::BrcValidate(v) => v.validate().await,
+            RuntimeValidator::BrcBenchmark(v) => v.validate().await,
             RuntimeValidator::HttpJsonExists(v) => v.validate().await,
             RuntimeValidator::HttpJsonField(v) => v.validate().await,
             RuntimeValidator::HttpPostJson(v) => v.validate().await,
@@ -136,6 +140,8 @@ impl RuntimeValidator {
             RuntimeValidator::CanCompile(_) => "can_compile",
             RuntimeValidator::OutputMatch(_) => "output_match",
             RuntimeValidator::Benchmark(_) => "benchmark",
+            RuntimeValidator::BrcValidate(_) => "brc_validate",
+            RuntimeValidator::BrcBenchmark(_) => "brc_benchmark",
             RuntimeValidator::HttpJsonExists(_) => "http_json_exists",
             RuntimeValidator::HttpJsonField(_) => "http_json_field",
             RuntimeValidator::HttpPostJson(_) => "http_post_json",
@@ -188,6 +194,8 @@ fn create_from_parsed(parsed: &ParsedValidator) -> Result<RuntimeValidator, Stri
         "can_compile" => create_can_compile(parsed),
         "output_match" => create_output_match(parsed),
         "benchmark" => create_benchmark(parsed),
+        "brc_validate" => create_brc_validate(parsed),
+        "brc_benchmark" => create_brc_benchmark(parsed),
         "http_get_file" => create_http_get_file(parsed),
         "http_get_compressed" => create_http_get_compressed(parsed),
         "file_contents_match" => create_file_contents_match(parsed),
@@ -367,6 +375,28 @@ fn create_benchmark(parsed: &ParsedValidator) -> Result<RuntimeValidator, String
     Ok(RuntimeValidator::Benchmark(BenchmarkValidator::new(
         command,
         expected_file,
+        max_time_ms,
+    )))
+}
+
+// brc_validate:string(./solution),string(data/measurements.txt)
+fn create_brc_validate(parsed: &ParsedValidator) -> Result<RuntimeValidator, String> {
+    let solution = parsed.param_as_string(0)?;
+    let measurements_file = parsed.param_as_string(1)?;
+    Ok(RuntimeValidator::BrcValidate(BrcValidator::new(
+        solution,
+        measurements_file,
+    )))
+}
+
+// brc_benchmark:string(./solution),string(data/measurements.txt),int(10000)
+fn create_brc_benchmark(parsed: &ParsedValidator) -> Result<RuntimeValidator, String> {
+    let solution = parsed.param_as_string(0)?;
+    let measurements_file = parsed.param_as_string(1)?;
+    let max_time_ms = parsed.param_as_int(2)? as u64;
+    Ok(RuntimeValidator::BrcBenchmark(BrcBenchmarkValidator::new(
+        solution,
+        measurements_file,
         max_time_ms,
     )))
 }
@@ -1230,5 +1260,23 @@ mod tests {
         )
         .unwrap();
         assert_eq!(validator.name(), "benchmark");
+    }
+
+    #[test]
+    fn test_create_brc_validate() {
+        let validator = create_validator(
+            "brc_validate:string(./solution),string(data/measurements.txt)",
+        )
+        .unwrap();
+        assert_eq!(validator.name(), "brc_validate");
+    }
+
+    #[test]
+    fn test_create_brc_benchmark() {
+        let validator = create_validator(
+            "brc_benchmark:string(./solution),string(data/measurements.txt),int(10000)",
+        )
+        .unwrap();
+        assert_eq!(validator.name(), "brc_benchmark");
     }
 }
