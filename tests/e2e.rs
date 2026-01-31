@@ -113,12 +113,7 @@ fn e2e_whoami_authenticated() {
 
     assert!(output.status.success(), "whoami failed: {}", stderr(&output));
     let out = stdout(&output);
-    // should show user email or name
-    assert!(
-        out.contains("@") || out.len() > 0,
-        "expected user info, got: {}",
-        out
-    );
+    assert!(!out.is_empty(), "expected user info, got empty output");
 }
 
 #[test]
