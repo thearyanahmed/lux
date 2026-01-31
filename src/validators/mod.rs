@@ -1,3 +1,4 @@
+pub mod benchmark;
 pub mod compile;
 pub mod docker;
 pub mod endpoint;
@@ -10,6 +11,7 @@ pub mod port;
 pub mod process;
 pub mod scenario;
 
+pub use benchmark::{BenchmarkValidator, OutputMatchValidator};
 pub use compile::CanCompileValidator;
 pub use docker::{DockerExecutor, DockerValidator, Expectation};
 pub use endpoint::EndpointValidator;
