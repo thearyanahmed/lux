@@ -71,7 +71,11 @@ enum Commands {
 #[derive(Subcommand)]
 enum LabAction {
     /// See all available labs you can work on
-    List,
+    List {
+        /// Open in browser: no value opens /labs, with index opens that lab
+        #[arg(short = 'w', long, num_args = 0..=1, default_missing_value = "-1")]
+        web: Option<i32>,
+    },
     /// Get details about a lab before starting
     Show {
         #[arg(short = 's', long)]
@@ -188,7 +192,7 @@ async fn main() -> Result<()> {
         }
 
         Commands::Lab { action } => match action {
-            LabAction::List => {
+            LabAction::List { web } => {
                 let config = Config::load()?;
                 if !config.has_auth_token() {
                     oops!("not authenticated. Run: `{}`", Commands::AUTH_USAGE);
@@ -199,6 +203,17 @@ async fn main() -> Result<()> {
                 match client.labs(None, None).await {
                     Ok(response) => {
                         Message::print_labs(&response);
+                        if let Some(index) = web {
+                            let url = if index < 0 {
+                                "https://projectlighthouse.io/labs".to_string()
+                            } else if let Some(lab) = response.data.get(index as usize) {
+                                lab.url()
+                            } else {
+                                oops!("invalid index: {}", index);
+                                return Ok(());
+                            };
+                            let _ = std::process::Command::new("open").arg(&url).spawn();
+                        }
                     }
                     Err(err) => {
                         oops!("failed to fetch labs: {}", err);
