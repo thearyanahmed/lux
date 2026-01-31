@@ -10,26 +10,31 @@ use std::process::Stdio;
 use std::time::Instant;
 use tokio::process::Command;
 
+fn current_dir_fallback() -> PathBuf {
+    std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+}
+
 /// get workspace from active lab state
 fn get_workspace() -> PathBuf {
     let config = match Config::load() {
         Ok(c) => c,
-        Err(_) => return std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+        Err(_) => return current_dir_fallback(),
     };
     if !config.has_auth_token() {
-        return std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        return current_dir_fallback();
     }
     let state = match LabState::load(config.expose_token()) {
         Ok(s) => s,
-        Err(_) => return std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+        Err(_) => return current_dir_fallback(),
     };
     match state.get_active() {
         Some(lab) => PathBuf::from(&lab.workspace),
-        None => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+        None => current_dir_fallback(),
     }
 }
 
 /// run a command and capture output
+/// note: uses split_whitespace for parsing, so paths with spaces are not supported
 async fn run_command(cmd_str: &str, workspace: &PathBuf) -> Result<(String, String, u64), String> {
     let parts: Vec<&str> = cmd_str.split_whitespace().collect();
     if parts.is_empty() {
@@ -83,6 +88,42 @@ fn normalize(s: &str) -> String {
     s.trim_end().to_string()
 }
 
+/// generate a diff preview message for mismatched output
+fn diff_preview(actual: &str, expected: &str) -> String {
+    let actual_lines: Vec<&str> = actual.lines().collect();
+    let expected_lines: Vec<&str> = expected.lines().collect();
+
+    for (i, (a, e)) in actual_lines.iter().zip(expected_lines.iter()).enumerate() {
+        if a != e {
+            return format!(
+                "line {}: expected '{}', got '{}'",
+                i + 1,
+                truncate(e, 50),
+                truncate(a, 50)
+            );
+        }
+    }
+
+    if actual_lines.len() != expected_lines.len() {
+        return format!(
+            "line count mismatch: expected {}, got {}",
+            expected_lines.len(),
+            actual_lines.len()
+        );
+    }
+
+    String::new()
+}
+
+/// truncate string for display
+fn truncate(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        format!("{}...", &s[..max_len])
+    }
+}
+
 /// Validator: run command and compare output to expected file
 pub struct OutputMatchValidator {
     pub command: String,
@@ -107,39 +148,9 @@ impl OutputMatchValidator {
         let expected = normalize(&expected);
 
         let result = if actual == expected {
-            Ok(format!(
-                "output matches ({}ms)",
-                elapsed_ms
-            ))
+            Ok(format!("output matches ({}ms)", elapsed_ms))
         } else {
-            // show diff preview
-            let actual_lines: Vec<&str> = actual.lines().collect();
-            let expected_lines: Vec<&str> = expected.lines().collect();
-
-            let mut diff_msg = String::new();
-            for (i, (a, e)) in actual_lines.iter().zip(expected_lines.iter()).enumerate() {
-                if a != e {
-                    diff_msg = format!(
-                        "line {}: expected '{}', got '{}'",
-                        i + 1,
-                        truncate(e, 50),
-                        truncate(a, 50)
-                    );
-                    break;
-                }
-            }
-
-            if diff_msg.is_empty() {
-                if actual_lines.len() != expected_lines.len() {
-                    diff_msg = format!(
-                        "line count mismatch: expected {}, got {}",
-                        expected_lines.len(),
-                        actual_lines.len()
-                    );
-                }
-            }
-
-            Err(format!("output mismatch: {}", diff_msg))
+            Err(format!("output mismatch: {}", diff_preview(&actual, &expected)))
         };
 
         Ok(TestCase {
@@ -180,33 +191,9 @@ impl BenchmarkValidator {
 
         // first check correctness
         if actual != expected {
-            let actual_lines: Vec<&str> = actual.lines().collect();
-            let expected_lines: Vec<&str> = expected.lines().collect();
-
-            let mut diff_msg = String::new();
-            for (i, (a, e)) in actual_lines.iter().zip(expected_lines.iter()).enumerate() {
-                if a != e {
-                    diff_msg = format!(
-                        "line {}: expected '{}', got '{}'",
-                        i + 1,
-                        truncate(e, 50),
-                        truncate(a, 50)
-                    );
-                    break;
-                }
-            }
-
-            if diff_msg.is_empty() && actual_lines.len() != expected_lines.len() {
-                diff_msg = format!(
-                    "line count mismatch: expected {}, got {}",
-                    expected_lines.len(),
-                    actual_lines.len()
-                );
-            }
-
             return Ok(TestCase {
                 name: format!("benchmark < {}ms", self.max_time_ms),
-                result: Err(format!("output mismatch: {}", diff_msg)),
+                result: Err(format!("output mismatch: {}", diff_preview(&actual, &expected))),
             });
         }
 
@@ -230,15 +217,6 @@ impl BenchmarkValidator {
     }
 }
 
-/// truncate string for display
-fn truncate(s: &str, max_len: usize) -> String {
-    if s.len() <= max_len {
-        s.to_string()
-    } else {
-        format!("{}...", &s[..max_len])
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -254,5 +232,29 @@ mod tests {
     fn test_truncate() {
         assert_eq!(truncate("hello", 10), "hello");
         assert_eq!(truncate("hello world", 5), "hello...");
+    }
+
+    #[test]
+    fn test_diff_preview_line_mismatch() {
+        let actual = "line1\nline2\nline3";
+        let expected = "line1\nLINE2\nline3";
+        let diff = diff_preview(actual, expected);
+        assert!(diff.contains("line 2"));
+    }
+
+    #[test]
+    fn test_diff_preview_count_mismatch() {
+        let actual = "line1\nline2";
+        let expected = "line1\nline2\nline3";
+        let diff = diff_preview(actual, expected);
+        assert!(diff.contains("line count mismatch"));
+    }
+
+    #[test]
+    fn test_diff_preview_identical() {
+        let actual = "line1\nline2";
+        let expected = "line1\nline2";
+        let diff = diff_preview(actual, expected);
+        assert!(diff.is_empty());
     }
 }
