@@ -1,9 +1,5 @@
 .PHONY: build run test e2e fmt lint clean dev check all local\:me local\:get release\:build
 
-# ==============================================================================
-# Local API Testing
-# ==============================================================================
-
 LOCAL_API_URL := http://0.0.0.0:8000/api/v1
 DEV_TOKEN_FILE := dev_token
 DEV_TOKEN := $(shell cat $(DEV_TOKEN_FILE) 2>/dev/null)

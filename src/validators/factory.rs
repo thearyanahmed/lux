@@ -485,10 +485,6 @@ fn create_concurrent_access(parsed: &ParsedValidator) -> Result<RuntimeValidator
     ))
 }
 
-// ============================================
-// SCENARIO VALIDATORS (multi-step)
-// ============================================
-
 // job_submission_verified:string(test),string(payload)
 fn create_job_submission_verified(parsed: &ParsedValidator) -> Result<RuntimeValidator, String> {
     let job_type = parsed.param_as_string(0).unwrap_or("test");
