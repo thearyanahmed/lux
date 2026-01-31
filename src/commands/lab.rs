@@ -197,3 +197,60 @@ pub fn set_workspace(workspace: &str) -> Result<()> {
 
     Ok(())
 }
+
+/// handle `luxctl lab restart`
+pub async fn restart() -> Result<()> {
+    let config = Config::load()?;
+    if !config.has_auth_token() {
+        UI::error(
+            "not authenticated",
+            Some("run `luxctl auth --token $token`"),
+        );
+        return Ok(());
+    }
+
+    let mut state = LabState::load(config.expose_token())?;
+
+    let lab = match state.get_active() {
+        Some(l) => l.clone(),
+        None => {
+            UI::error("no active lab", None);
+            UI::note("run `luxctl lab start --slug <SLUG>` first");
+            return Ok(());
+        }
+    };
+
+    let client = LighthouseAPIClient::from_config(&config);
+
+    match client.restart_lab(&lab.slug).await {
+        Ok(response) => {
+            // refresh tasks from server
+            match client.lab_by_slug(&lab.slug).await {
+                Ok(refreshed_lab) => {
+                    let tasks = refreshed_lab.tasks.as_deref().unwrap_or(&[]);
+                    state.set_active(
+                        &lab.slug,
+                        &lab.name,
+                        tasks,
+                        &lab.workspace,
+                        lab.runtime.as_deref(),
+                    );
+                    state.save(config.expose_token())?;
+                }
+                Err(_) => {
+                    // if refresh fails, just clear local progress
+                    state.clear_progress();
+                    state.save(config.expose_token())?;
+                }
+            }
+
+            UI::success(&format!("restarted lab: {}", lab.name));
+            UI::info(&response.message);
+        }
+        Err(err) => {
+            UI::error("failed to restart lab", Some(&format!("{}", err)));
+        }
+    }
+
+    Ok(())
+}

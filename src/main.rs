@@ -104,6 +104,8 @@ enum LabAction {
         #[arg(short = 'w', long)]
         workspace: Option<String>,
     },
+    /// Start fresh - reset all progress on the current lab
+    Restart,
 }
 
 #[derive(Subcommand)]
@@ -254,6 +256,9 @@ async fn main() -> Result<()> {
                 if runtime.is_none() && workspace.is_none() {
                     oops!("provide --runtime or --workspace to set");
                 }
+            }
+            LabAction::Restart => {
+                commands::lab::restart().await?;
             }
         },
 
