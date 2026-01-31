@@ -1,4 +1,4 @@
-.PHONY: build run test fmt lint clean dev check all local\:me local\:get release\:build
+.PHONY: build run test e2e fmt lint clean dev check all local\:me local\:get release\:build
 
 # ==============================================================================
 # Local API Testing
@@ -42,6 +42,10 @@ run:
 # Run tests
 test:
 	cargo test
+
+# Run E2E tests (requires local API running)
+e2e:
+	cargo test --test e2e -- --ignored --nocapture
 
 # Format code
 fmt:
