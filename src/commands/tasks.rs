@@ -23,7 +23,7 @@ pub async fn list(refresh: bool) -> Result<()> {
         l.clone()
     } else {
         UI::error("no active lab", None);
-        UI::note("run `luxctl lab start --slug <SLUG>` first");
+        UI::note("run `luxctl lab start --id <ID>` first");
         return Ok(());
     };
 

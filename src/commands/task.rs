@@ -24,7 +24,7 @@ pub async fn show(task_id: &str, detailed: bool) -> Result<()> {
         l.slug.clone()
     } else {
         UI::error("no active lab", None);
-        UI::note("run `luxctl lab start --slug <SLUG>` first");
+        UI::note("run `luxctl lab start --id <ID>` first");
         return Ok(());
     };
 

@@ -246,7 +246,7 @@ fn check_lab_state(config: &Option<Config>) {
         UI::ok("progress", Some(&progress));
     } else {
         UI::ok("lab", Some("none active"));
-        UI::note("run `luxctl lab start --slug <SLUG>` to begin");
+        UI::note("run `luxctl lab start --id <ID>` to begin");
     }
 }
 

@@ -5,7 +5,7 @@ use crate::config::Config;
 use crate::state::LabState;
 use crate::ui::UI;
 
-/// handle `luxctl lab start --slug <slug> --workspace <path> [--runtime <runtime>]`
+/// handle `luxctl lab start --id <id> --workspace <path> [--runtime <runtime>]`
 pub async fn start(slug: &str, workspace: &str, runtime: Option<&str>) -> Result<()> {
     let config = Config::load()?;
     if !config.has_auth_token() {
@@ -95,7 +95,7 @@ pub fn status() -> Result<()> {
         UI::note("run `luxctl tasks` for task list");
     } else {
         UI::info("no active lab");
-        UI::note("run `luxctl lab start --slug <SLUG>` to start one");
+        UI::note("run `luxctl lab start --id <ID>` to start one");
     }
 
     Ok(())
@@ -148,7 +148,7 @@ pub fn set_runtime(runtime: &str) -> Result<()> {
         UI::success(&format!("runtime set to: {}", runtime));
     } else {
         UI::error("no active lab", None);
-        UI::note("run `luxctl lab start --slug <SLUG>` first");
+        UI::note("run `luxctl lab start --id <ID>` first");
     }
 
     Ok(())
@@ -169,7 +169,7 @@ pub fn set_workspace(workspace: &str) -> Result<()> {
 
     if state.get_active().is_none() {
         UI::error("no active lab", None);
-        UI::note("run `luxctl lab start --slug <SLUG>` first");
+        UI::note("run `luxctl lab start --id <ID>` first");
         return Ok(());
     }
 
@@ -219,7 +219,7 @@ pub async fn restart() -> Result<()> {
         Some(l) => l.clone(),
         None => {
             UI::error("no active lab", None);
-            UI::note("run `luxctl lab start --slug <SLUG>` first");
+            UI::note("run `luxctl lab start --id <ID>` first");
             return Ok(());
         }
     };

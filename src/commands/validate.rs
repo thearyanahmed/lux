@@ -66,7 +66,7 @@ pub async fn validate_all(include_passed: bool, detailed: bool) -> Result<()> {
         l.clone()
     } else {
         oops!("no active lab");
-        say!("run `luxctl lab start --slug <SLUG>` first");
+        say!("run `luxctl lab start --id <ID>` first");
         return Ok(());
     };
 
