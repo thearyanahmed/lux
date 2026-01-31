@@ -39,6 +39,7 @@ impl Message {
     }
 
     pub fn print_labs(response: &PaginatedResponse<Lab>) {
+        println!();
         for (i, lab) in response.data.iter().enumerate() {
             Self::print_lab(lab, i);
         }
@@ -46,16 +47,16 @@ impl Message {
 
     fn print_lab(lab: &Lab, index: usize) {
         println!(
-            "  {} {} {}",
-            format!("{}.", index).dimmed(),
+            "{}. {} {}",
+            index,
             lab.name.bold(),
             format!("/{}", lab.slug).dimmed()
         );
         if let Some(desc) = &lab.short_description {
-            println!("    {}\n", desc);
-        } else {
-            println!();
+            println!("{}", desc);
         }
+        println!();
+        println!();
     }
 
     pub fn print_lab_detail(lab: &Lab) {
