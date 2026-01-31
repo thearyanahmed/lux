@@ -7,7 +7,7 @@ const SYM_PASS: &str = "✓";
 const SYM_FAIL: &str = "✗";
 const SYM_WARN: &str = "!";
 const SYM_SKIP: &str = "○";
-const INDENT: &str = "  ";
+const INDENT: &str = "";
 
 /// UI output for running validators, matching HeroTerminal visual style
 pub struct RunUI {
