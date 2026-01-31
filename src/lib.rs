@@ -10,4 +10,4 @@ pub mod tasks;
 pub mod ui;
 pub mod validators;
 
-pub const VERSION: &str = "0.6.3";
+pub const VERSION: &str = "0.7.0";
