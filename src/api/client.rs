@@ -9,8 +9,8 @@ use crate::{config::Config, VERSION};
 
 use super::types::{
     ApiError, ApiUser, HealthCheckResponse, HintsResponse, Lab, PaginatedResponse,
-    SubmitAnswerRequest, SubmitAnswerResponse, SubmitAttemptRequest, SubmitAttemptResponse,
-    UnlockHintResponse,
+    RestartLabResponse, SubmitAnswerRequest, SubmitAnswerResponse, SubmitAttemptRequest,
+    SubmitAttemptResponse, UnlockHintResponse,
 };
 
 pub struct LighthouseAPIClient {
@@ -210,6 +210,14 @@ impl LighthouseAPIClient {
         let headers = self.auth_headers()?;
         let endpoint = format!("tasks/{}/submit", task_identifier);
         self.post::<SubmitAnswerResponse, _>(&endpoint, request, Some(headers))
+            .await
+    }
+
+    /// restart a lab from scratch (creates new attempt group)
+    pub async fn restart_lab(&self, slug: &str) -> Result<RestartLabResponse> {
+        let headers = self.auth_headers()?;
+        let endpoint = format!("labs/{}/restart", slug);
+        self.post::<RestartLabResponse, _>(&endpoint, &serde_json::json!({}), Some(headers))
             .await
     }
 }
