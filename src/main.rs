@@ -242,7 +242,31 @@ async fn main() -> Result<()> {
                 workspace,
                 runtime,
             } => {
-                commands::lab::start(&slug, &workspace, runtime.as_deref()).await?;
+                let actual_slug = if let Ok(index) = slug.parse::<usize>() {
+                    let config = Config::load()?;
+                    if !config.has_auth_token() {
+                        oops!("not authenticated. Run: `{}`", Commands::AUTH_USAGE);
+                        return Ok(());
+                    }
+                    let client = LighthouseAPIClient::from_config(&config);
+                    match client.labs(None, None).await {
+                        Ok(response) => {
+                            if let Some(lab) = response.data.get(index) {
+                                lab.slug.clone()
+                            } else {
+                                oops!("invalid index: {}", index);
+                                return Ok(());
+                            }
+                        }
+                        Err(err) => {
+                            oops!("failed to fetch labs: {}", err);
+                            return Ok(());
+                        }
+                    }
+                } else {
+                    slug
+                };
+                commands::lab::start(&actual_slug, &workspace, runtime.as_deref()).await?;
             }
             LabAction::Status => {
                 commands::lab::status()?;
