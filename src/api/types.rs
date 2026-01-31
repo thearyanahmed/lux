@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::LIGHTHOUSE_URL;
+
 #[derive(Debug, Deserialize)]
 pub struct ApiError {
     pub message: String,
@@ -91,7 +93,7 @@ pub struct Lab {
 
 impl Lab {
     pub fn url(&self) -> String {
-        format!("https://projectlighthouse.io/labs/{}", self.slug)
+        format!("{}/labs/{}", LIGHTHOUSE_URL, self.slug)
     }
 }
 

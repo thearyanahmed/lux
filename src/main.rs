@@ -3,7 +3,7 @@ use color_eyre::eyre::Result;
 
 use luxctl::{
     api::LighthouseAPIClient, auth::TokenAuthenticator, commands, config::Config, greet,
-    message::Message, oops, VERSION,
+    message::Message, oops, LIGHTHOUSE_URL, VERSION,
 };
 
 #[derive(Parser)]
@@ -205,7 +205,7 @@ async fn main() -> Result<()> {
                         Message::print_labs(&response);
                         if let Some(index) = web {
                             let url = if index < 0 {
-                                "https://projectlighthouse.io/labs".to_string()
+                                format!("{}/labs", LIGHTHOUSE_URL)
                             } else if let Some(lab) = response.data.get(index as usize) {
                                 lab.url()
                             } else {
