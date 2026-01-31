@@ -39,7 +39,11 @@ pub async fn start(slug: &str, workspace: &str, runtime: Option<&str>) -> Result
             .join(workspace_path)
     };
 
-    let workspace_str = absolute_workspace.to_string_lossy().to_string();
+    let canonical = absolute_workspace
+        .canonicalize()
+        .unwrap_or(absolute_workspace);
+
+    let workspace_str = canonical.to_string_lossy().to_string();
 
     let tasks = lab.tasks.as_deref().unwrap_or(&[]);
 
