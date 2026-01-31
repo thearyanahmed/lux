@@ -228,6 +228,16 @@ impl LabState {
         });
     }
 
+    /// reset all task progress to initial state (for lab restart)
+    pub fn clear_progress(&mut self) {
+        self.with_active_mut(|l| {
+            for task in &mut l.tasks {
+                task.status = TaskStatus::ChallengeAwaits;
+                task.points_earned = 0;
+            }
+        });
+    }
+
     /// compute HMAC-SHA256 checksum of lab data
     /// returns empty string if HMAC creation fails (should never happen for SHA256)
     fn compute_checksum(lab: &Option<ActiveLab>, token: &str) -> String {
