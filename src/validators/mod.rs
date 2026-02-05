@@ -1,5 +1,6 @@
 pub mod benchmark;
 pub mod compile;
+pub mod container;
 pub mod docker;
 pub mod endpoint;
 pub mod factory;
@@ -13,6 +14,11 @@ pub mod scenario;
 
 pub use benchmark::{BenchmarkValidator, OutputMatchValidator};
 pub use compile::CanCompileValidator;
+pub use container::{
+    DockerCgroupMemoryValidator, DockerChrootValidator, DockerExecValidator,
+    DockerExitCodeValidator, DockerMountNamespaceValidator, DockerNetworkNamespaceValidator,
+    DockerPidNamespaceValidator, DockerPullValidator, DockerVethPairValidator,
+};
 pub use docker::{DockerExecutor, DockerValidator, Expectation};
 pub use endpoint::EndpointValidator;
 pub use factory::{create_validator, RuntimeValidator};

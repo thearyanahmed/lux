@@ -1,5 +1,10 @@
 use super::benchmark::{BenchmarkValidator, BrcBenchmarkValidator, BrcValidator, OutputMatchValidator};
 use super::compile::CanCompileValidator;
+use super::container::{
+    DockerCgroupMemoryValidator, DockerChrootValidator, DockerExecValidator,
+    DockerExitCodeValidator, DockerMountNamespaceValidator, DockerNetworkNamespaceValidator,
+    DockerPidNamespaceValidator, DockerPullValidator, DockerVethPairValidator,
+};
 use super::docker::{DockerValidator, Expectation};
 use super::file::FileContentsMatchValidator;
 use super::http::{
@@ -67,6 +72,16 @@ pub enum RuntimeValidator {
     HttpKeepalive(HttpKeepaliveValidator),
     HttpChunked(HttpChunkedValidator),
     HttpPipelining(HttpPipeliningValidator),
+    // container validators (for "Build Your Own Docker" lab)
+    DockerExec(DockerExecValidator),
+    DockerExitCode(DockerExitCodeValidator),
+    DockerPidNamespace(DockerPidNamespaceValidator),
+    DockerChroot(DockerChrootValidator),
+    DockerPull(DockerPullValidator),
+    DockerMountNamespace(DockerMountNamespaceValidator),
+    DockerCgroupMemory(DockerCgroupMemoryValidator),
+    DockerNetworkNamespace(DockerNetworkNamespaceValidator),
+    DockerVethPair(DockerVethPairValidator),
     // placeholder for validators not yet implemented
     NotImplemented(String),
 }
@@ -117,6 +132,16 @@ impl RuntimeValidator {
             RuntimeValidator::HttpKeepalive(v) => v.validate().await,
             RuntimeValidator::HttpChunked(v) => v.validate().await,
             RuntimeValidator::HttpPipelining(v) => v.validate().await,
+            // container validators
+            RuntimeValidator::DockerExec(v) => v.validate().await,
+            RuntimeValidator::DockerExitCode(v) => v.validate().await,
+            RuntimeValidator::DockerPidNamespace(v) => v.validate().await,
+            RuntimeValidator::DockerChroot(v) => v.validate().await,
+            RuntimeValidator::DockerPull(v) => v.validate().await,
+            RuntimeValidator::DockerMountNamespace(v) => v.validate().await,
+            RuntimeValidator::DockerCgroupMemory(v) => v.validate().await,
+            RuntimeValidator::DockerNetworkNamespace(v) => v.validate().await,
+            RuntimeValidator::DockerVethPair(v) => v.validate().await,
             RuntimeValidator::NotImplemented(name) => Ok(TestCase {
                 name: format!("validator '{}'", name),
                 result: Err(format!("validator '{}' not implemented yet", name)),
@@ -169,6 +194,16 @@ impl RuntimeValidator {
             RuntimeValidator::HttpKeepalive(_) => "http_keepalive",
             RuntimeValidator::HttpChunked(_) => "http_chunked",
             RuntimeValidator::HttpPipelining(_) => "http_pipelining",
+            // container validators
+            RuntimeValidator::DockerExec(_) => "docker_exec",
+            RuntimeValidator::DockerExitCode(_) => "docker_exit_code",
+            RuntimeValidator::DockerPidNamespace(_) => "docker_pid_namespace",
+            RuntimeValidator::DockerChroot(_) => "docker_chroot",
+            RuntimeValidator::DockerPull(_) => "docker_pull",
+            RuntimeValidator::DockerMountNamespace(_) => "docker_mount_namespace",
+            RuntimeValidator::DockerCgroupMemory(_) => "docker_cgroup_memory",
+            RuntimeValidator::DockerNetworkNamespace(_) => "docker_network_namespace",
+            RuntimeValidator::DockerVethPair(_) => "docker_veth_pair",
             RuntimeValidator::NotImplemented(name) => name,
         }
     }
@@ -248,6 +283,16 @@ fn create_from_parsed(parsed: &ParsedValidator) -> Result<RuntimeValidator, Stri
         "http_chunked_format" => create_http_chunked_format(parsed),
         "http_file_post" => create_http_file_post(parsed),
         "http_file_verify" => create_http_file_verify(parsed),
+        // container validators (Build Your Own Docker)
+        "docker_exec" => create_docker_exec(parsed),
+        "docker_exit_code" => create_docker_exit_code(parsed),
+        "docker_pid_namespace" => create_docker_pid_namespace(parsed),
+        "docker_chroot" => create_docker_chroot(parsed),
+        "docker_pull" => create_docker_pull(parsed),
+        "docker_mount_namespace" => create_docker_mount_namespace(parsed),
+        "docker_cgroup_memory" => create_docker_cgroup_memory(parsed),
+        "docker_network_namespace" => create_docker_network_namespace(parsed),
+        "docker_veth_pair" => create_docker_veth_pair(parsed),
         _ => Ok(RuntimeValidator::NotImplemented(parsed.name.clone())),
     }
 }
@@ -948,6 +993,86 @@ fn create_http_file_verify(parsed: &ParsedValidator) -> Result<RuntimeValidator,
     )))
 }
 
+// ============================================================================
+// Container validators (Build Your Own Docker)
+// ============================================================================
+
+// docker_exec:string(cmd),string(expected) - run command and check stdout
+fn create_docker_exec(parsed: &ParsedValidator) -> Result<RuntimeValidator, String> {
+    let command = parsed.param_as_string(0)?;
+    let expected = parsed.param_as_string(1)?;
+    Ok(RuntimeValidator::DockerExec(DockerExecValidator::new(
+        command, expected,
+    )))
+}
+
+// docker_exit_code:int(code) - run ls /nonexistent and check exit code
+fn create_docker_exit_code(parsed: &ParsedValidator) -> Result<RuntimeValidator, String> {
+    let code = parsed.param_as_int(0)? as i32;
+    Ok(RuntimeValidator::DockerExitCode(
+        DockerExitCodeValidator::new(code),
+    ))
+}
+
+// docker_pid_namespace:int(expected_pid) - verify PID 1 in namespace
+fn create_docker_pid_namespace(parsed: &ParsedValidator) -> Result<RuntimeValidator, String> {
+    let expected_pid = parsed.param_as_int(0)? as i32;
+    Ok(RuntimeValidator::DockerPidNamespace(
+        DockerPidNamespaceValidator::new(expected_pid),
+    ))
+}
+
+// docker_chroot:bool(expected) - verify filesystem isolation
+fn create_docker_chroot(parsed: &ParsedValidator) -> Result<RuntimeValidator, String> {
+    let expected = parsed.param_as_bool(0)?;
+    Ok(RuntimeValidator::DockerChroot(DockerChrootValidator::new(
+        expected,
+    )))
+}
+
+// docker_pull:string(image),bool(success) - pull image from registry
+fn create_docker_pull(parsed: &ParsedValidator) -> Result<RuntimeValidator, String> {
+    let image = parsed.param_as_string(0)?;
+    let expected_success = parsed.param_as_bool(1)?;
+    Ok(RuntimeValidator::DockerPull(DockerPullValidator::new(
+        image,
+        expected_success,
+    )))
+}
+
+// docker_mount_namespace:bool(expected) - verify mount namespace isolation
+fn create_docker_mount_namespace(parsed: &ParsedValidator) -> Result<RuntimeValidator, String> {
+    let expected = parsed.param_as_bool(0)?;
+    Ok(RuntimeValidator::DockerMountNamespace(
+        DockerMountNamespaceValidator::new(expected),
+    ))
+}
+
+// docker_cgroup_memory:int(bytes),bool(oom_expected) - verify memory cgroup limits
+fn create_docker_cgroup_memory(parsed: &ParsedValidator) -> Result<RuntimeValidator, String> {
+    let bytes = parsed.param_as_int(0)? as u64;
+    let oom_expected = parsed.param_as_bool(1)?;
+    Ok(RuntimeValidator::DockerCgroupMemory(
+        DockerCgroupMemoryValidator::new(bytes, oom_expected),
+    ))
+}
+
+// docker_network_namespace:bool(expected) - verify network namespace isolation
+fn create_docker_network_namespace(parsed: &ParsedValidator) -> Result<RuntimeValidator, String> {
+    let expected = parsed.param_as_bool(0)?;
+    Ok(RuntimeValidator::DockerNetworkNamespace(
+        DockerNetworkNamespaceValidator::new(expected),
+    ))
+}
+
+// docker_veth_pair:bool(expected) - verify veth pair connectivity
+fn create_docker_veth_pair(parsed: &ParsedValidator) -> Result<RuntimeValidator, String> {
+    let expected = parsed.param_as_bool(0)?;
+    Ok(RuntimeValidator::DockerVethPair(
+        DockerVethPairValidator::new(expected),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1278,5 +1403,64 @@ mod tests {
         )
         .unwrap();
         assert_eq!(validator.name(), "brc_benchmark");
+    }
+
+    // container validator tests
+
+    #[test]
+    fn test_create_docker_exec() {
+        let validator =
+            create_validator("docker_exec:string(echo hello),string(hello)").unwrap();
+        assert_eq!(validator.name(), "docker_exec");
+    }
+
+    #[test]
+    fn test_create_docker_exit_code() {
+        let validator = create_validator("docker_exit_code:int(2)").unwrap();
+        assert_eq!(validator.name(), "docker_exit_code");
+    }
+
+    #[test]
+    fn test_create_docker_pid_namespace() {
+        let validator = create_validator("docker_pid_namespace:int(1)").unwrap();
+        assert_eq!(validator.name(), "docker_pid_namespace");
+    }
+
+    #[test]
+    fn test_create_docker_chroot() {
+        let validator = create_validator("docker_chroot:bool(true)").unwrap();
+        assert_eq!(validator.name(), "docker_chroot");
+    }
+
+    #[test]
+    fn test_create_docker_pull() {
+        let validator =
+            create_validator("docker_pull:string(alpine:latest),bool(true)").unwrap();
+        assert_eq!(validator.name(), "docker_pull");
+    }
+
+    #[test]
+    fn test_create_docker_mount_namespace() {
+        let validator = create_validator("docker_mount_namespace:bool(true)").unwrap();
+        assert_eq!(validator.name(), "docker_mount_namespace");
+    }
+
+    #[test]
+    fn test_create_docker_cgroup_memory() {
+        let validator =
+            create_validator("docker_cgroup_memory:int(10485760),bool(true)").unwrap();
+        assert_eq!(validator.name(), "docker_cgroup_memory");
+    }
+
+    #[test]
+    fn test_create_docker_network_namespace() {
+        let validator = create_validator("docker_network_namespace:bool(true)").unwrap();
+        assert_eq!(validator.name(), "docker_network_namespace");
+    }
+
+    #[test]
+    fn test_create_docker_veth_pair() {
+        let validator = create_validator("docker_veth_pair:bool(true)").unwrap();
+        assert_eq!(validator.name(), "docker_veth_pair");
     }
 }
