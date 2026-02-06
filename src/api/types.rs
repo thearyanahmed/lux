@@ -142,7 +142,11 @@ pub struct Task {
     pub status: TaskStatus,
     #[serde(default)]
     pub is_free: bool,
+    /// sequential lock: previous task not completed
     pub is_locked: bool,
+    /// payment lock: task is not free AND user doesn't have lab subscription
+    #[serde(default)]
+    pub is_paid: bool,
     pub abandoned_deduction: i32,
     pub points_earned: i32,
     pub hints: Vec<Hint>,
