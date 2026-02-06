@@ -13,11 +13,15 @@ use crate::{oops, say};
 pub struct FilteredTasks<'a> {
     pub to_run: Vec<&'a Task>,
     pub skipped_completed: usize,
+    /// sequential lock: previous task not completed
     pub skipped_locked: usize,
+    /// payment lock: requires voyager subscription
+    pub skipped_paid: usize,
 }
 
 /// filter tasks based on locked status and completion
-/// - locked tasks are always skipped
+/// - paid tasks (requires subscription) are always skipped
+/// - locked tasks (sequential) are always skipped
 /// - completed tasks are skipped unless include_passed is true
 pub fn filter_tasks_for_validation<'a>(
     tasks: &'a [Task],
@@ -26,12 +30,19 @@ pub fn filter_tasks_for_validation<'a>(
     let mut to_run = Vec::new();
     let mut skipped_completed = 0;
     let mut skipped_locked = 0;
+    let mut skipped_paid = 0;
 
     for task in tasks {
         let is_completed = task.status.is_completed();
-        let is_locked = task.is_locked;
 
-        if is_locked {
+        // payment lock takes priority (requires subscription)
+        if task.is_paid {
+            skipped_paid += 1;
+            continue;
+        }
+
+        // sequential lock (previous task not done)
+        if task.is_locked {
             skipped_locked += 1;
             continue;
         }
@@ -48,6 +59,7 @@ pub fn filter_tasks_for_validation<'a>(
         to_run,
         skipped_completed,
         skipped_locked,
+        skipped_paid,
     }
 }
 
@@ -137,7 +149,13 @@ pub async fn validate_all(include_passed: bool, detailed: bool) -> Result<()> {
         say!("    skipped: {} (completed)", filtered.skipped_completed);
     }
     if filtered.skipped_locked > 0 {
-        say!("    skipped: {} (locked)", filtered.skipped_locked);
+        say!("    skipped: {} (previous task incomplete)", filtered.skipped_locked);
+    }
+    if filtered.skipped_paid > 0 {
+        say!(
+            "    skipped: {} (requires subscription)",
+            filtered.skipped_paid
+        );
     }
 
     Ok(())
@@ -149,6 +167,20 @@ mod tests {
     use crate::api::{TaskInputType, TaskStatus};
 
     fn make_task(id: i32, slug: &str, status: TaskStatus, is_locked: bool) -> Task {
+        make_task_full(id, slug, status, is_locked, false)
+    }
+
+    fn make_paid_task(id: i32, slug: &str, status: TaskStatus) -> Task {
+        make_task_full(id, slug, status, false, true)
+    }
+
+    fn make_task_full(
+        id: i32,
+        slug: &str,
+        status: TaskStatus,
+        is_locked: bool,
+        is_paid: bool,
+    ) -> Task {
         Task {
             id,
             uuid: String::new(),
@@ -161,6 +193,7 @@ mod tests {
             status,
             is_free: false,
             is_locked,
+            is_paid,
             abandoned_deduction: 5,
             points_earned: 0,
             hints: vec![],
@@ -251,5 +284,55 @@ mod tests {
         assert_eq!(result.to_run.len(), 3);
         assert_eq!(result.skipped_locked, 0);
         assert_eq!(result.skipped_completed, 0);
+        assert_eq!(result.skipped_paid, 0);
+    }
+
+    #[test]
+    fn test_filter_skips_paid_tasks() {
+        let tasks = vec![
+            make_task(1, "task-1", TaskStatus::ChallengeAwaits, false),
+            make_paid_task(2, "task-2", TaskStatus::ChallengeAwaits), // paid
+            make_paid_task(3, "task-3", TaskStatus::ChallengeAwaits), // paid
+        ];
+
+        let result = filter_tasks_for_validation(&tasks, false);
+
+        assert_eq!(result.to_run.len(), 1);
+        assert_eq!(result.to_run[0].slug, "task-1");
+        assert_eq!(result.skipped_paid, 2);
+        assert_eq!(result.skipped_locked, 0);
+        assert_eq!(result.skipped_completed, 0);
+    }
+
+    #[test]
+    fn test_filter_paid_takes_priority_over_locked() {
+        // task that is both paid AND locked should be counted as paid (payment takes priority)
+        let mut task = make_paid_task(1, "task-1", TaskStatus::ChallengeAwaits);
+        task.is_locked = true;
+        let tasks = vec![task];
+
+        let result = filter_tasks_for_validation(&tasks, false);
+
+        assert_eq!(result.to_run.len(), 0);
+        assert_eq!(result.skipped_paid, 1);
+        assert_eq!(result.skipped_locked, 0); // not counted as locked
+    }
+
+    #[test]
+    fn test_filter_mixed_paid_locked_completed() {
+        let tasks = vec![
+            make_task(1, "task-1", TaskStatus::ChallengeCompleted, false), // completed
+            make_paid_task(2, "task-2", TaskStatus::ChallengeAwaits),      // paid
+            make_task(3, "task-3", TaskStatus::ChallengeAwaits, true),     // locked
+            make_task(4, "task-4", TaskStatus::ChallengeAwaits, false),    // available
+        ];
+
+        let result = filter_tasks_for_validation(&tasks, false);
+
+        assert_eq!(result.to_run.len(), 1);
+        assert_eq!(result.to_run[0].slug, "task-4");
+        assert_eq!(result.skipped_paid, 1);
+        assert_eq!(result.skipped_locked, 1);
+        assert_eq!(result.skipped_completed, 1);
     }
 }
