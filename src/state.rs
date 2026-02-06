@@ -295,6 +295,7 @@ mod tests {
             status: TaskStatus::ChallengeAwaits,
             is_free: false,
             is_locked: false,
+            is_paid: false,
             abandoned_deduction: 5,
             points_earned: 35,
             hints: vec![],
