@@ -149,7 +149,10 @@ pub async fn validate_all(include_passed: bool, detailed: bool) -> Result<()> {
         say!("    skipped: {} (completed)", filtered.skipped_completed);
     }
     if filtered.skipped_locked > 0 {
-        say!("    skipped: {} (previous task incomplete)", filtered.skipped_locked);
+        say!(
+            "    skipped: {} (previous task incomplete)",
+            filtered.skipped_locked
+        );
     }
     if filtered.skipped_paid > 0 {
         say!(

@@ -1,4 +1,6 @@
-use super::benchmark::{BenchmarkValidator, BrcBenchmarkValidator, BrcValidator, OutputMatchValidator};
+use super::benchmark::{
+    BenchmarkValidator, BrcBenchmarkValidator, BrcValidator, OutputMatchValidator,
+};
 use super::compile::CanCompileValidator;
 use super::container::{
     DockerCgroupMemoryValidator, DockerChrootValidator, DockerExecValidator,
@@ -1389,10 +1391,9 @@ mod tests {
 
     #[test]
     fn test_create_brc_validate() {
-        let validator = create_validator(
-            "brc_validate:string(./solution),string(data/measurements.txt)",
-        )
-        .unwrap();
+        let validator =
+            create_validator("brc_validate:string(./solution),string(data/measurements.txt)")
+                .unwrap();
         assert_eq!(validator.name(), "brc_validate");
     }
 
@@ -1409,8 +1410,7 @@ mod tests {
 
     #[test]
     fn test_create_docker_exec() {
-        let validator =
-            create_validator("docker_exec:string(echo hello),string(hello)").unwrap();
+        let validator = create_validator("docker_exec:string(echo hello),string(hello)").unwrap();
         assert_eq!(validator.name(), "docker_exec");
     }
 
@@ -1434,8 +1434,7 @@ mod tests {
 
     #[test]
     fn test_create_docker_pull() {
-        let validator =
-            create_validator("docker_pull:string(alpine:latest),bool(true)").unwrap();
+        let validator = create_validator("docker_pull:string(alpine:latest),bool(true)").unwrap();
         assert_eq!(validator.name(), "docker_pull");
     }
 
@@ -1447,8 +1446,7 @@ mod tests {
 
     #[test]
     fn test_create_docker_cgroup_memory() {
-        let validator =
-            create_validator("docker_cgroup_memory:int(10485760),bool(true)").unwrap();
+        let validator = create_validator("docker_cgroup_memory:int(10485760),bool(true)").unwrap();
         assert_eq!(validator.name(), "docker_cgroup_memory");
     }
 

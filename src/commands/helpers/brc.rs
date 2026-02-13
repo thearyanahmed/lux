@@ -501,7 +501,13 @@ pub fn generate(rows: u64, measurements_path: &str, expected_path: &str) -> Resu
             expected.push_str(", ");
         }
         first = false;
-        expected.push_str(&format!("{}={:.1}/{:.1}/{:.1}", name, s.min, s.mean(), s.max));
+        expected.push_str(&format!(
+            "{}={:.1}/{:.1}/{:.1}",
+            name,
+            s.min,
+            s.mean(),
+            s.max
+        ));
     }
     expected.push_str("}\n");
 
@@ -540,8 +546,12 @@ mod tests {
         let measurements = dir.path().join("measurements.txt");
         let expected = dir.path().join("expected.txt");
 
-        generate(100, measurements.to_str().unwrap(), expected.to_str().unwrap())
-            .expect("generate failed");
+        generate(
+            100,
+            measurements.to_str().unwrap(),
+            expected.to_str().unwrap(),
+        )
+        .expect("generate failed");
 
         assert!(measurements.exists(), "measurements file should exist");
         assert!(expected.exists(), "expected file should exist");
@@ -553,8 +563,12 @@ mod tests {
         let measurements = dir.path().join("measurements.txt");
         let expected = dir.path().join("expected.txt");
 
-        generate(50, measurements.to_str().unwrap(), expected.to_str().unwrap())
-            .expect("generate failed");
+        generate(
+            50,
+            measurements.to_str().unwrap(),
+            expected.to_str().unwrap(),
+        )
+        .expect("generate failed");
 
         let content = fs::read_to_string(&measurements).expect("failed to read");
         let line_count = content.lines().count();
@@ -567,17 +581,29 @@ mod tests {
         let measurements = dir.path().join("measurements.txt");
         let expected = dir.path().join("expected.txt");
 
-        generate(10, measurements.to_str().unwrap(), expected.to_str().unwrap())
-            .expect("generate failed");
+        generate(
+            10,
+            measurements.to_str().unwrap(),
+            expected.to_str().unwrap(),
+        )
+        .expect("generate failed");
 
         let content = fs::read_to_string(&measurements).expect("failed to read");
         for line in content.lines() {
-            assert!(line.contains(';'), "line should contain semicolon: {}", line);
+            assert!(
+                line.contains(';'),
+                "line should contain semicolon: {}",
+                line
+            );
             let parts: Vec<&str> = line.split(';').collect();
             assert_eq!(parts.len(), 2, "line should have 2 parts: {}", line);
             // temperature should be parseable
             let temp: f64 = parts[1].parse().expect("temperature should be a number");
-            assert!(temp > -50.0 && temp < 60.0, "temp should be reasonable: {}", temp);
+            assert!(
+                temp > -50.0 && temp < 60.0,
+                "temp should be reasonable: {}",
+                temp
+            );
         }
     }
 
@@ -587,14 +613,21 @@ mod tests {
         let measurements = dir.path().join("measurements.txt");
         let expected = dir.path().join("expected.txt");
 
-        generate(100, measurements.to_str().unwrap(), expected.to_str().unwrap())
-            .expect("generate failed");
+        generate(
+            100,
+            measurements.to_str().unwrap(),
+            expected.to_str().unwrap(),
+        )
+        .expect("generate failed");
 
         let content = fs::read_to_string(&expected).expect("failed to read");
         assert!(content.starts_with('{'), "expected should start with {{");
         assert!(content.trim().ends_with('}'), "expected should end with }}");
         // should contain station=min/mean/max format
-        assert!(content.contains('/'), "expected should contain / separators");
+        assert!(
+            content.contains('/'),
+            "expected should contain / separators"
+        );
     }
 
     #[test]
@@ -603,11 +636,21 @@ mod tests {
         let measurements = dir.path().join("data/nested/measurements.txt");
         let expected = dir.path().join("expected/nested/output.txt");
 
-        generate(10, measurements.to_str().unwrap(), expected.to_str().unwrap())
-            .expect("generate failed");
+        generate(
+            10,
+            measurements.to_str().unwrap(),
+            expected.to_str().unwrap(),
+        )
+        .expect("generate failed");
 
-        assert!(measurements.exists(), "measurements file should exist in nested dir");
-        assert!(expected.exists(), "expected file should exist in nested dir");
+        assert!(
+            measurements.exists(),
+            "measurements file should exist in nested dir"
+        );
+        assert!(
+            expected.exists(),
+            "expected file should exist in nested dir"
+        );
     }
 
     #[test]

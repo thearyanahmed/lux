@@ -210,7 +210,10 @@ impl DockerPidNamespaceValidator {
             .map_err(|_| format!("failed to parse PID from output: '{}'", pid_str))?;
 
         let result = if pid == self.expected_pid {
-            Ok(format!("PID is {} as expected (namespace isolation working)", pid))
+            Ok(format!(
+                "PID is {} as expected (namespace isolation working)",
+                pid
+            ))
         } else {
             Err(format!(
                 "expected PID {}, got {} (PID namespace not isolated)",
@@ -268,8 +271,9 @@ impl DockerChrootValidator {
 
         let has_bin = entries.contains(&"bin");
         let has_etc = entries.contains(&"etc");
-        let has_host_markers =
-            entries.contains(&"Users") || entries.contains(&"System") || entries.contains(&"Library");
+        let has_host_markers = entries.contains(&"Users")
+            || entries.contains(&"System")
+            || entries.contains(&"Library");
 
         let is_isolated = has_bin && has_etc && !has_host_markers;
 
@@ -334,10 +338,7 @@ impl DockerPullValidator {
                 truncate(&output.stderr, 100)
             ))
         } else {
-            Err(format!(
-                "pull unexpectedly succeeded for: {}",
-                self.image
-            ))
+            Err(format!("pull unexpectedly succeeded for: {}", self.image))
         };
 
         Ok(TestCase {
@@ -452,10 +453,7 @@ impl DockerCgroupMemoryValidator {
             &memory_flag,
             "sh",
             "-c",
-            &format!(
-                "head -c {} /dev/zero | tail -c 1",
-                stress_mb * 1024 * 1024
-            ),
+            &format!("head -c {} /dev/zero | tail -c 1", stress_mb * 1024 * 1024),
         ];
 
         let output = run_docker_command(&args, &workspace).await?;
@@ -627,20 +625,17 @@ impl DockerVethPairValidator {
 
         let result = if is_connected == self.expected_connected {
             if is_connected {
-                Ok(format!("veth pair connected (can reach gateway {})", gateway))
+                Ok(format!(
+                    "veth pair connected (can reach gateway {})",
+                    gateway
+                ))
             } else {
                 Ok("veth pair not connected as expected".to_string())
             }
         } else if self.expected_connected {
-            Err(format!(
-                "cannot reach gateway {} via veth pair",
-                gateway
-            ))
+            Err(format!("cannot reach gateway {} via veth pair", gateway))
         } else {
-            Err(format!(
-                "unexpectedly connected to gateway {}",
-                gateway
-            ))
+            Err(format!("unexpectedly connected to gateway {}", gateway))
         };
 
         Ok(TestCase {

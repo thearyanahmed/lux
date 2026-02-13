@@ -8,8 +8,8 @@
 //!
 //! Note: Uses 0.0.0.0 instead of localhost to avoid IPv6 resolution issues
 
-use std::process::{Command, Output};
 use std::path::Path;
+use std::process::{Command, Output};
 
 const API_BASE_URL: &str = "http://0.0.0.0:8000";
 
@@ -67,7 +67,8 @@ fn require_api() {
 }
 
 fn require_token() -> String {
-    get_test_token().expect("Token required. Add to dev_token file or set LUXCTL_E2E_TOKEN env var.")
+    get_test_token()
+        .expect("Token required. Add to dev_token file or set LUXCTL_E2E_TOKEN env var.")
 }
 
 #[test]
@@ -97,7 +98,10 @@ fn e2e_auth_with_invalid_token() {
     // should fail gracefully
     let combined = format!("{}{}", stdout(&output), stderr(&output)).to_lowercase();
     assert!(
-        combined.contains("invalid") || combined.contains("unauthorized") || combined.contains("unauthenticated") || combined.contains("failed"),
+        combined.contains("invalid")
+            || combined.contains("unauthorized")
+            || combined.contains("unauthenticated")
+            || combined.contains("failed"),
         "expected error message for invalid token, got: {}",
         combined
     );
@@ -111,7 +115,11 @@ fn e2e_whoami_authenticated() {
 
     let output = luxctl_with_token(&["whoami"], &token);
 
-    assert!(output.status.success(), "whoami failed: {}", stderr(&output));
+    assert!(
+        output.status.success(),
+        "whoami failed: {}",
+        stderr(&output)
+    );
     let out = stdout(&output);
     assert!(!out.is_empty(), "expected user info, got empty output");
 }
@@ -147,7 +155,11 @@ fn e2e_lab_list() {
 
     let output = luxctl_with_token(&["lab", "list"], &token);
 
-    assert!(output.status.success(), "lab list failed: {}", stderr(&output));
+    assert!(
+        output.status.success(),
+        "lab list failed: {}",
+        stderr(&output)
+    );
     // should show at least some output (labs or empty message)
     let out = stdout(&output);
     assert!(!out.is_empty(), "expected lab list output");
@@ -179,7 +191,17 @@ fn e2e_lab_lifecycle() {
     let token = require_token();
 
     // 1. start a lab
-    let output = luxctl_with_token(&["lab", "start", "--slug", "1brc", "--workspace", "/tmp/luxctl-e2e-workspace"], &token);
+    let output = luxctl_with_token(
+        &[
+            "lab",
+            "start",
+            "--slug",
+            "1brc",
+            "--workspace",
+            "/tmp/luxctl-e2e-workspace",
+        ],
+        &token,
+    );
     let out = stdout(&output);
     let err = stderr(&output);
 
@@ -196,7 +218,11 @@ fn e2e_lab_lifecycle() {
 
         // 2. check status
         let output = luxctl(&["lab", "status"]);
-        assert!(output.status.success(), "lab status failed: {}", stderr(&output));
+        assert!(
+            output.status.success(),
+            "lab status failed: {}",
+            stderr(&output)
+        );
         let out = stdout(&output);
         assert!(
             out.contains("1brc") || out.contains("active"),
@@ -206,7 +232,11 @@ fn e2e_lab_lifecycle() {
 
         // 3. list tasks
         let output = luxctl(&["task", "list"]);
-        assert!(output.status.success(), "task list failed: {}", stderr(&output));
+        assert!(
+            output.status.success(),
+            "task list failed: {}",
+            stderr(&output)
+        );
 
         // 4. restart lab
         let output = luxctl(&["lab", "restart"]);
@@ -218,7 +248,11 @@ fn e2e_lab_lifecycle() {
 
         // 5. stop lab
         let output = luxctl(&["lab", "stop"]);
-        assert!(output.status.success(), "lab stop failed: {}", stderr(&output));
+        assert!(
+            output.status.success(),
+            "lab stop failed: {}",
+            stderr(&output)
+        );
         let out = stdout(&output);
         assert!(
             out.contains("stopped") || out.contains("no active lab"),
@@ -235,17 +269,24 @@ fn e2e_task_show() {
     let token = require_token();
 
     // start a lab first
-    let _ = luxctl_with_token(&["lab", "start", "--slug", "1brc", "--workspace", "/tmp/luxctl-e2e-workspace"], &token);
+    let _ = luxctl_with_token(
+        &[
+            "lab",
+            "start",
+            "--slug",
+            "1brc",
+            "--workspace",
+            "/tmp/luxctl-e2e-workspace",
+        ],
+        &token,
+    );
 
     // try to show first task
     let output = luxctl(&["task", "show", "--task", "1"]);
 
     // might succeed or fail depending on lab state, but shouldn't crash
     let combined = format!("{}{}", stdout(&output), stderr(&output));
-    assert!(
-        !combined.is_empty(),
-        "expected some output from task show"
-    );
+    assert!(!combined.is_empty(), "expected some output from task show");
 
     // cleanup
     let _ = luxctl(&["lab", "stop"]);
@@ -258,7 +299,11 @@ fn e2e_doctor() {
 
     let output = luxctl(&["doctor"]);
 
-    assert!(output.status.success(), "doctor failed: {}", stderr(&output));
+    assert!(
+        output.status.success(),
+        "doctor failed: {}",
+        stderr(&output)
+    );
     // doctor should output some diagnostics
     assert!(!stdout(&output).is_empty(), "expected doctor output");
 }

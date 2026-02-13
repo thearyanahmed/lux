@@ -79,8 +79,13 @@ fn read_expected(path: &str, workspace: &PathBuf) -> Result<String, String> {
         workspace.join(path)
     };
 
-    std::fs::read_to_string(&full_path)
-        .map_err(|e| format!("failed to read expected file '{}': {}", full_path.display(), e))
+    std::fs::read_to_string(&full_path).map_err(|e| {
+        format!(
+            "failed to read expected file '{}': {}",
+            full_path.display(),
+            e
+        )
+    })
 }
 
 /// normalize output for comparison (trim trailing whitespace)
@@ -150,7 +155,10 @@ impl OutputMatchValidator {
         let result = if actual == expected {
             Ok(format!("output matches ({}ms)", elapsed_ms))
         } else {
-            Err(format!("output mismatch: {}", diff_preview(&actual, &expected)))
+            Err(format!(
+                "output mismatch: {}",
+                diff_preview(&actual, &expected)
+            ))
         };
 
         Ok(TestCase {
@@ -193,7 +201,10 @@ impl BenchmarkValidator {
         if actual != expected {
             return Ok(TestCase {
                 name: format!("benchmark < {}ms", self.max_time_ms),
-                result: Err(format!("output mismatch: {}", diff_preview(&actual, &expected))),
+                result: Err(format!(
+                    "output mismatch: {}",
+                    diff_preview(&actual, &expected)
+                )),
             });
         }
 
@@ -311,7 +322,10 @@ impl BrcValidator {
         let result = if actual == expected {
             Ok(format!("output correct ({}ms)", elapsed_ms))
         } else {
-            Err(format!("output mismatch: {}", diff_preview(&actual, &expected)))
+            Err(format!(
+                "output mismatch: {}",
+                diff_preview(&actual, &expected)
+            ))
         };
 
         Ok(TestCase {
@@ -418,7 +432,10 @@ impl BrcBenchmarkValidator {
         if actual != expected {
             return Ok(TestCase {
                 name: format!("brc benchmark < {}ms", self.max_time_ms),
-                result: Err(format!("output mismatch: {}", diff_preview(&actual, &expected))),
+                result: Err(format!(
+                    "output mismatch: {}",
+                    diff_preview(&actual, &expected)
+                )),
             });
         }
 
