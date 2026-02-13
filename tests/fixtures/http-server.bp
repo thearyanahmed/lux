@@ -1,0 +1,34 @@
+blueprint "Build Your Own HTTP Server" {
+    config {
+        host: localhost
+        port: 4221
+        timeout: 10s
+    }
+    phase "tcp foundations" {
+        step "port is listening" {
+            probe tcp 4221
+            expect { connected: true }
+        }
+    }
+    phase "basic routing" {
+        depends-on: "tcp foundations"
+        step "root returns 200" {
+            probe http GET /
+            expect { status: 200 }
+        }
+        step "unknown path returns 404" {
+            probe http GET /nonexistent-path
+            expect { status: 404 }
+        }
+    }
+    phase "echo endpoint" {
+        depends-on: "basic routing"
+        step "echoes hello" {
+            probe http GET /echo/hello
+            expect {
+                status: 200
+                body: "hello"
+            }
+        }
+    }
+}
