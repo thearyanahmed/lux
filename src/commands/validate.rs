@@ -64,7 +64,7 @@ pub fn filter_tasks_for_validation<'a>(
 }
 
 /// handle `luxctl validate [--all] [--detailed]`
-pub async fn validate_all(include_passed: bool, detailed: bool) -> Result<()> {
+pub async fn validate_all(include_passed: bool, _detailed: bool) -> Result<()> {
     let config = Config::load()?;
     if !config.has_auth_token() {
         oops!("not authenticated. Run: `luxctl auth --token $token`");
@@ -136,7 +136,6 @@ pub async fn validate_all(include_passed: bool, detailed: bool) -> Result<()> {
             &client,
             &lab.slug,
             task,
-            detailed,
             Some((&mut state, &token)),
         )
         .await?;

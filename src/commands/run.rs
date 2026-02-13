@@ -1,19 +1,17 @@
 use blueprint::reporter::CliReporter;
 use color_eyre::eyre::Result;
 
-use crate::api::{LighthouseAPIClient, SubmitAttemptRequest, Task, TaskOutcome, TaskStatus};
+use crate::api::{LighthouseAPIClient, SubmitAttemptRequest, Task, TaskStatus};
 use crate::commands::blueprint_runner::{self, TaskSystem};
 use crate::config::Config;
 use crate::shell;
 use crate::state::LabState;
-use crate::tasks::{TestCase, TestResults};
 use crate::ui::RunUI;
-use crate::validators::create_validator;
 use crate::{complain, oops, say};
 
 /// handle `luxctl run --task <slug|number> [--lab <slug>]`
 /// task can be specified by slug or by number (1, 01, 2, 02, etc.)
-pub async fn run(task_id: &str, lab_slug: Option<&str>, detailed: bool) -> Result<()> {
+pub async fn run(task_id: &str, lab_slug: Option<&str>, _detailed: bool) -> Result<()> {
     let config = Config::load()?;
     if !config.has_auth_token() {
         oops!("not authenticated. Run: `luxctl auth --token $token`");
@@ -85,32 +83,28 @@ pub async fn run(task_id: &str, lab_slug: Option<&str>, detailed: bool) -> Resul
         &client,
         &lab_data.slug,
         task_data,
-        detailed,
         Some((&mut state, &token)),
     )
     .await
 }
 
-/// run validators for a single task and submit results.
-/// routes to blueprint or legacy system based on task fields.
+/// run blueprint for a single task and submit results.
 /// optionally updates cached state when state_ctx is provided.
 pub async fn run_task_validators(
     client: &LighthouseAPIClient,
     lab_slug: &str,
     task: &Task,
-    detailed: bool,
     state_ctx: Option<(&mut LabState, &str)>,
 ) -> Result<()> {
     match blueprint_runner::detect_system(task) {
         TaskSystem::Blueprint(source) => {
             run_blueprint_task(client, lab_slug, task, source, state_ctx).await
         }
-        TaskSystem::Legacy(_) => run_legacy_task(client, lab_slug, task, detailed, state_ctx).await,
         TaskSystem::None => {
             let ui = RunUI::new(&task.slug, 0);
             ui.header();
             ui.blank_line();
-            ui.step("no validators defined for this task");
+            ui.step("no blueprint defined for this task");
             Ok(())
         }
     }
@@ -166,133 +160,6 @@ async fn run_blueprint_task(
 
     // submit attempt
     let attempt_request = blueprint_runner::to_attempt_request(&bp_result, lab_slug, task.id);
-    submit_and_update(client, &attempt_request, &ui, task, state_ctx).await;
-
-    run_epilogue(&ui, &task.epilogue).await;
-    Ok(())
-}
-
-/// run a task using the legacy validator DSL strings
-async fn run_legacy_task(
-    client: &LighthouseAPIClient,
-    lab_slug: &str,
-    task: &Task,
-    _detailed: bool,
-    state_ctx: Option<(&mut LabState, &str)>,
-) -> Result<()> {
-    let ui = RunUI::new(&task.slug, task.validators.len());
-
-    if task.status.is_completed() {
-        complain!("you've already passed this task");
-        say!("running validators anyway for verification...");
-    }
-
-    ui.header();
-    ui.blank_line();
-
-    // prologue
-    if !task.prologue.is_empty() {
-        ui.step(&format!(
-            "Running {} setup commands...",
-            task.prologue.len()
-        ));
-        if let Err((cmd, result)) = shell::run_commands(&task.prologue).await {
-            oops!("setup command failed: {}", cmd);
-            if !result.stderr.is_empty() {
-                say!("stderr: {}", result.stderr.trim());
-            }
-            run_epilogue(&ui, &task.epilogue).await;
-            return Ok(());
-        }
-        ui.blank_line();
-    }
-
-    ui.step(&format!("Running {} validators...", task.validators.len()));
-    ui.blank_line();
-
-    let mut results = TestResults::new();
-
-    for validator_str in task.validators.iter() {
-        log::debug!("parsing validator: {}", validator_str);
-
-        let validator = match create_validator(validator_str) {
-            Ok(v) => v,
-            Err(err) => {
-                oops!("invalid validator '{}': {}", validator_str, err);
-                continue;
-            }
-        };
-
-        match validator.validate().await {
-            Ok(test_case) => {
-                if test_case.passed() {
-                    ui.test_pass(&test_case.name);
-                } else {
-                    let detail = if test_case.message() != test_case.name {
-                        Some(test_case.message())
-                    } else {
-                        None
-                    };
-                    ui.test_fail(&test_case.name, detail);
-                }
-                results.add(test_case);
-            }
-            Err(err) => {
-                ui.test_fail(&err, None);
-                let failed_case = TestCase {
-                    name: err.clone(),
-                    result: Err(err),
-                };
-                results.add(failed_case);
-            }
-        }
-    }
-
-    ui.blank_line();
-    if results.all_passed() {
-        ui.summary_pass(results.total());
-    } else {
-        ui.summary_fail(results.passed(), results.total());
-
-        if !task.hints.is_empty() {
-            for hint in &task.hints {
-                ui.hint(&hint.text);
-            }
-        }
-    }
-
-    // build attempt request from legacy results
-    let outcome = if results.all_passed() {
-        TaskOutcome::Passed
-    } else {
-        TaskOutcome::Failed
-    };
-
-    let context = results
-        .tests
-        .iter()
-        .enumerate()
-        .map(|(i, t)| {
-            let status = if t.passed() { "PASS" } else { "FAIL" };
-            format!("#{} [{}] {}: {}", i + 1, status, t.name, t.message())
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    let context = if context.len() > 4900 {
-        format!("{}...[truncated]", &context[..4900])
-    } else {
-        context
-    };
-
-    let attempt_request = SubmitAttemptRequest {
-        lab_slug: lab_slug.to_string(),
-        task_id: task.id,
-        task_outcome: outcome,
-        points_achieved: None,
-        task_outcome_context: Some(context),
-    };
-
     submit_and_update(client, &attempt_request, &ui, task, state_ctx).await;
 
     run_epilogue(&ui, &task.epilogue).await;

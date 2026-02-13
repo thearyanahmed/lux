@@ -13,20 +13,15 @@ use crate::api::{SubmitAttemptRequest, Task, TaskOutcome};
 /// which validation system a task uses
 pub enum TaskSystem<'a> {
     Blueprint(&'a str),
-    Legacy(&'a [String]),
     None,
 }
 
 /// inspect task fields to decide which system to use.
-/// blueprint takes priority — if both are present, blueprint wins.
 pub fn detect_system(task: &Task) -> TaskSystem<'_> {
     if let Some(ref bp) = task.blueprint {
         if !bp.is_empty() {
             return TaskSystem::Blueprint(bp);
         }
-    }
-    if !task.validators.is_empty() {
-        return TaskSystem::Legacy(&task.validators);
     }
     TaskSystem::None
 }
@@ -166,30 +161,15 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_legacy() {
-        let task = make_task(vec!["tcp_listening:int(8080)".to_string()], None);
-        assert!(matches!(detect_system(&task), TaskSystem::Legacy(_)));
-    }
-
-    #[test]
-    fn test_detect_none() {
+    fn test_detect_none_without_blueprint() {
         let task = make_task(vec![], None);
         assert!(matches!(detect_system(&task), TaskSystem::None));
     }
 
     #[test]
-    fn test_blueprint_takes_priority_over_legacy() {
-        let task = make_task(
-            vec!["tcp_listening:int(8080)".to_string()],
-            Some("blueprint \"test\" {}".to_string()),
-        );
-        assert!(matches!(detect_system(&task), TaskSystem::Blueprint(_)));
-    }
-
-    #[test]
-    fn test_empty_blueprint_falls_through_to_legacy() {
-        let task = make_task(vec!["tcp_listening:int(8080)".to_string()], Some(String::new()));
-        assert!(matches!(detect_system(&task), TaskSystem::Legacy(_)));
+    fn test_detect_none_with_empty_blueprint() {
+        let task = make_task(vec![], Some(String::new()));
+        assert!(matches!(detect_system(&task), TaskSystem::None));
     }
 
     #[test]
