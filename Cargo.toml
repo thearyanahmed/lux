@@ -1,3 +1,6 @@
+[workspace]
+members = [".", "crates/blueprint"]
+
 [package]
 name = "luxctl"
 version = "0.7.0"
@@ -11,6 +14,7 @@ categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
 
 [dependencies]
+blueprint = { path = "crates/blueprint" }
 tokio = { version = "1.42", features = ["full"] }
 once_cell = "1.20"
 clap = { version = "4.5.52", features = ["derive"] }
