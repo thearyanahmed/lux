@@ -151,6 +151,9 @@ pub struct Task {
     pub points_earned: i32,
     pub hints: Vec<Hint>,
     pub validators: Vec<String>,
+    /// blueprint source text (.bp DSL) — if present, used instead of validators
+    #[serde(default)]
+    pub blueprint: Option<String>,
     /// commands to run before validators (e.g., docker compose up)
     #[serde(default)]
     pub prologue: Vec<String>,
@@ -163,6 +166,10 @@ impl Task {
     /// check if this task accepts user input
     pub fn accepts_input(&self) -> bool {
         self.input_type != TaskInputType::None
+    }
+
+    pub fn has_blueprint(&self) -> bool {
+        self.blueprint.as_ref().is_some_and(|s| !s.is_empty())
     }
 }
 
@@ -640,6 +647,50 @@ mod tests {
 
         assert_eq!(task.input_type, TaskInputType::None);
         assert!(!task.accepts_input());
+    }
+
+    #[test]
+    fn test_task_has_blueprint() {
+        let json = r#"{
+            "id": 1,
+            "slug": "bp-task",
+            "title": "Blueprint Task",
+            "description": "Uses blueprint",
+            "sort_order": 1,
+            "scores": "5:10:50",
+            "status": "challenge_awaits",
+            "is_locked": false,
+            "abandoned_deduction": 5,
+            "points_earned": 0,
+            "hints": [],
+            "validators": [],
+            "blueprint": "blueprint \"test\" { }"
+        }"#;
+
+        let task: Task = serde_json::from_str(json).unwrap();
+        assert!(task.has_blueprint());
+    }
+
+    #[test]
+    fn test_task_without_blueprint_defaults_to_none() {
+        let json = r#"{
+            "id": 1,
+            "slug": "legacy-task",
+            "title": "Legacy Task",
+            "description": "Uses validators",
+            "sort_order": 1,
+            "scores": "5:10:50",
+            "status": "challenge_awaits",
+            "is_locked": false,
+            "abandoned_deduction": 5,
+            "points_earned": 0,
+            "hints": [],
+            "validators": ["tcp_listening:int(8080)"]
+        }"#;
+
+        let task: Task = serde_json::from_str(json).unwrap();
+        assert!(!task.has_blueprint());
+        assert!(task.blueprint.is_none());
     }
 
     #[test]

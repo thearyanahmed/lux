@@ -300,6 +300,7 @@ mod tests {
             points_earned: 35,
             hints: vec![],
             validators: vec!["tcp_listening:int(8080)".to_string()],
+            blueprint: None,
             prologue: vec![],
             epilogue: vec![],
         };
