@@ -58,6 +58,29 @@ enum Commands {
         all: bool,
     },
 
+    /// Submit answers for blueprint tasks that require user input
+    Result {
+        #[arg(short = 'l', long)]
+        lab: Option<String>,
+
+        #[arg(short = 't', long)]
+        task: String,
+
+        /// Input values as key=value pairs (repeatable)
+        #[arg(short = 'i', long = "input")]
+        inputs: Vec<String>,
+    },
+
+    /// Parse a .bp file and print the transpiled IR as JSON (offline, no auth)
+    Export {
+        /// Path to the .bp file
+        file: String,
+
+        /// Output format
+        #[arg(short = 'f', long, default_value = "json")]
+        format: String,
+    },
+
     /// Stuck on a task? Hints can help, but they might cost you XP
     Hint {
         #[command(subcommand)]
@@ -328,6 +351,14 @@ async fn main() -> Result<()> {
 
         Commands::Validate { detailed, all } => {
             commands::validate::validate_all(all, detailed).await?;
+        }
+
+        Commands::Result { lab, task, inputs } => {
+            commands::result::result(&task, &inputs, lab.as_deref()).await?;
+        }
+
+        Commands::Export { file, format } => {
+            commands::export::export(&file, &format)?;
         }
 
         Commands::Hint { action } => match action {
