@@ -253,4 +253,48 @@ mod tests {
         let req = to_attempt_request(&bp_result, "my-lab", 1);
         assert!(matches!(req.task_outcome, TaskOutcome::Failed));
     }
+
+    #[tokio::test]
+    async fn test_run_validate_with_file_probe() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("hello.txt");
+        std::fs::write(&file_path, "hello world").unwrap();
+
+        // file probe path is unquoted in the DSL
+        let bp_source = format!(
+            r#"blueprint "file test" {{
+    phase "check" {{
+        step "file exists" {{
+            probe file {}
+            expect {{ exists: true }}
+        }}
+    }}
+}}"#,
+            file_path.display()
+        );
+
+        let result = run_validate(&bp_source, "test-task").await.unwrap();
+        assert!(matches!(result.status, Status::Passed));
+    }
+
+    #[tokio::test]
+    async fn test_run_validate_fails_on_missing_file() {
+        let bp_source = r#"blueprint "missing" {
+    phase "check" {
+        step "file exists" {
+            probe file "/tmp/luxctl-nonexistent-file-test"
+            expect { exists: true }
+        }
+    }
+}"#;
+
+        let result = run_validate(bp_source, "test-task").await.unwrap();
+        assert!(matches!(result.status, Status::Failed));
+    }
+
+    #[tokio::test]
+    async fn test_run_validate_parse_error() {
+        let result = run_validate("not valid blueprint syntax {{{", "test-task").await;
+        assert!(result.is_err());
+    }
 }
