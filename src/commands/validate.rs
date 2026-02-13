@@ -125,7 +125,9 @@ pub async fn validate_all(include_passed: bool, detailed: bool) -> Result<()> {
 
     // run each task
     for (i, task) in filtered.to_run.iter().enumerate() {
-        let ui = RunUI::new(&task.slug, task.validators.len());
+        // blueprint tasks have 0 legacy validators; count doesn't affect separator display
+        let validator_count = if task.has_blueprint() { 0 } else { task.validators.len() };
+        let ui = RunUI::new(&task.slug, validator_count);
         println!();
         ui.task_separator(i + 1, total_tasks, &task.slug);
 
@@ -201,6 +203,7 @@ mod tests {
             points_earned: 0,
             hints: vec![],
             validators: vec![],
+            blueprint: None,
             prologue: vec![],
             epilogue: vec![],
         }

@@ -1,6 +1,8 @@
+use blueprint::reporter::CliReporter;
 use color_eyre::eyre::Result;
 
 use crate::api::{LighthouseAPIClient, SubmitAttemptRequest, Task, TaskOutcome, TaskStatus};
+use crate::commands::blueprint_runner::{self, TaskSystem};
 use crate::config::Config;
 use crate::shell;
 use crate::state::LabState;
@@ -89,28 +91,50 @@ pub async fn run(task_id: &str, lab_slug: Option<&str>, detailed: bool) -> Resul
     .await
 }
 
-/// run validators for a single task and submit results
-/// optionally updates cached state when state_ctx is provided
+/// run validators for a single task and submit results.
+/// routes to blueprint or legacy system based on task fields.
+/// optionally updates cached state when state_ctx is provided.
 pub async fn run_task_validators(
     client: &LighthouseAPIClient,
     lab_slug: &str,
     task: &Task,
-    _detailed: bool,
+    detailed: bool,
     state_ctx: Option<(&mut LabState, &str)>,
 ) -> Result<()> {
-    let ui = RunUI::new(&task.slug, task.validators.len());
+    match blueprint_runner::detect_system(task) {
+        TaskSystem::Blueprint(source) => {
+            run_blueprint_task(client, lab_slug, task, source, state_ctx).await
+        }
+        TaskSystem::Legacy(_) => run_legacy_task(client, lab_slug, task, detailed, state_ctx).await,
+        TaskSystem::None => {
+            let ui = RunUI::new(&task.slug, 0);
+            ui.header();
+            ui.blank_line();
+            ui.step("no validators defined for this task");
+            Ok(())
+        }
+    }
+}
 
-    // check if task already completed
-    let already_passed = task.status.is_completed();
-    if already_passed {
+/// run a task using the blueprint engine (parse → transpile → execute)
+async fn run_blueprint_task(
+    client: &LighthouseAPIClient,
+    lab_slug: &str,
+    task: &Task,
+    bp_source: &str,
+    state_ctx: Option<(&mut LabState, &str)>,
+) -> Result<()> {
+    let ui = RunUI::new(&task.slug, 0);
+
+    if task.status.is_completed() {
         complain!("you've already passed this task");
-        say!("running validators anyway for verification...");
+        say!("running blueprint anyway for verification...");
     }
 
     ui.header();
     ui.blank_line();
 
-    // run prologue commands
+    // prologue
     if !task.prologue.is_empty() {
         ui.step(&format!(
             "Running {} setup commands...",
@@ -121,18 +145,66 @@ pub async fn run_task_validators(
             if !result.stderr.is_empty() {
                 say!("stderr: {}", result.stderr.trim());
             }
-            // run epilogue for cleanup even if prologue fails
             run_epilogue(&ui, &task.epilogue).await;
             return Ok(());
         }
         ui.blank_line();
     }
 
-    // run validators
-    if task.validators.is_empty() {
-        ui.step("no validators defined for this task");
-        run_epilogue(&ui, &task.epilogue).await;
-        return Ok(());
+    ui.step("Running blueprint...");
+
+    let bp_result = match blueprint_runner::run_validate(bp_source, &task.slug).await {
+        Ok(r) => r,
+        Err(err) => {
+            oops!("blueprint failed: {}", err);
+            run_epilogue(&ui, &task.epilogue).await;
+            return Ok(());
+        }
+    };
+
+    CliReporter::print_result(&bp_result);
+
+    // submit attempt
+    let attempt_request = blueprint_runner::to_attempt_request(&bp_result, lab_slug, task.id);
+    submit_and_update(client, &attempt_request, &ui, task, state_ctx).await;
+
+    run_epilogue(&ui, &task.epilogue).await;
+    Ok(())
+}
+
+/// run a task using the legacy validator DSL strings
+async fn run_legacy_task(
+    client: &LighthouseAPIClient,
+    lab_slug: &str,
+    task: &Task,
+    _detailed: bool,
+    state_ctx: Option<(&mut LabState, &str)>,
+) -> Result<()> {
+    let ui = RunUI::new(&task.slug, task.validators.len());
+
+    if task.status.is_completed() {
+        complain!("you've already passed this task");
+        say!("running validators anyway for verification...");
+    }
+
+    ui.header();
+    ui.blank_line();
+
+    // prologue
+    if !task.prologue.is_empty() {
+        ui.step(&format!(
+            "Running {} setup commands...",
+            task.prologue.len()
+        ));
+        if let Err((cmd, result)) = shell::run_commands(&task.prologue).await {
+            oops!("setup command failed: {}", cmd);
+            if !result.stderr.is_empty() {
+                say!("stderr: {}", result.stderr.trim());
+            }
+            run_epilogue(&ui, &task.epilogue).await;
+            return Ok(());
+        }
+        ui.blank_line();
     }
 
     ui.step(&format!("Running {} validators...", task.validators.len()));
@@ -182,7 +254,6 @@ pub async fn run_task_validators(
     } else {
         ui.summary_fail(results.passed(), results.total());
 
-        // show hints from task if available
         if !task.hints.is_empty() {
             for hint in &task.hints {
                 ui.hint(&hint.text);
@@ -190,14 +261,13 @@ pub async fn run_task_validators(
         }
     }
 
-    // report results back to API
+    // build attempt request from legacy results
     let outcome = if results.all_passed() {
         TaskOutcome::Passed
     } else {
         TaskOutcome::Failed
     };
 
-    // build context string from test results
     let context = results
         .tests
         .iter()
@@ -209,7 +279,6 @@ pub async fn run_task_validators(
         .collect::<Vec<_>>()
         .join("\n");
 
-    // truncate context if too long (API limit is 5000 chars)
     let context = if context.len() > 4900 {
         format!("{}...[truncated]", &context[..4900])
     } else {
@@ -224,7 +293,21 @@ pub async fn run_task_validators(
         task_outcome_context: Some(context),
     };
 
-    match client.submit_attempt(&attempt_request).await {
+    submit_and_update(client, &attempt_request, &ui, task, state_ctx).await;
+
+    run_epilogue(&ui, &task.epilogue).await;
+    Ok(())
+}
+
+/// submit attempt to API and update local state cache
+pub async fn submit_and_update(
+    client: &LighthouseAPIClient,
+    attempt_request: &SubmitAttemptRequest,
+    ui: &RunUI,
+    task: &Task,
+    state_ctx: Option<(&mut LabState, &str)>,
+) {
+    match client.submit_attempt(attempt_request).await {
         Ok(response) => {
             log::debug!("attempt recorded: {:?}", response);
             if response.data.is_reattempt {
@@ -233,7 +316,6 @@ pub async fn run_task_validators(
                 ui.points_earned(response.data.points_achieved);
             }
 
-            // update cached task status if state context provided
             if let Some((state, token)) = state_ctx {
                 let new_status = if response.data.task_outcome == "passed" {
                     TaskStatus::ChallengeCompleted
@@ -251,11 +333,6 @@ pub async fn run_task_validators(
             oops!("failed to submit results: {}", err);
         }
     }
-
-    // run epilogue commands (cleanup)
-    run_epilogue(&ui, &task.epilogue).await;
-
-    Ok(())
 }
 
 /// run epilogue commands with best-effort (continues even on failure)
@@ -307,6 +384,7 @@ mod tests {
             points_earned: 0,
             hints: vec![],
             validators,
+            blueprint: None,
             prologue,
             epilogue,
         }
