@@ -10,5 +10,5 @@ pub mod tasks;
 pub mod ui;
 pub mod validators;
 
-pub const VERSION: &str = "0.7.0";
+pub const VERSION: &str = "0.7.1";
 pub const LIGHTHOUSE_URL: &str = "https://projectlighthouse.io";
