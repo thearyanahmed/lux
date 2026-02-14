@@ -2,35 +2,14 @@
 
 CLI for [projectlighthouse.io](https://projectlighthouse.io) — learn by building real systems.
 
+![luxctl](./images/luxctl-dev-env.png)
+
 ## Install
 
 ### Pre-built Binaries (Recommended)
 
 Download the latest binary for your platform from the [releases page](https://github.com/thearyanahmed/luxctl/releases):
 
-```bash
-# Linux (x86_64)
-curl -L https://github.com/thearyanahmed/luxctl/releases/latest/download/luxctl-linux-x86_64.tar.gz | tar xz
-sudo mv luxctl /usr/local/bin/
-
-# Linux (x86_64, musl - for Alpine/containers)
-curl -L https://github.com/thearyanahmed/luxctl/releases/latest/download/luxctl-linux-x86_64-musl.tar.gz | tar xz
-sudo mv luxctl /usr/local/bin/
-
-# macOS (Intel)
-curl -L https://github.com/thearyanahmed/luxctl/releases/latest/download/luxctl-macos-x86_64.tar.gz | tar xz
-sudo mv luxctl /usr/local/bin/
-
-# macOS (Apple Silicon)
-curl -L https://github.com/thearyanahmed/luxctl/releases/latest/download/luxctl-macos-aarch64.tar.gz | tar xz
-sudo mv luxctl /usr/local/bin/
-
-# Windows (PowerShell)
-Invoke-WebRequest -Uri "https://github.com/thearyanahmed/luxctl/releases/latest/download/luxctl-windows-x86_64.exe.zip" -OutFile "luxctl.zip"
-Expand-Archive -Path luxctl.zip -DestinationPath .
-Move-Item luxctl-windows-x86_64.exe luxctl.exe
-# Add to PATH or move to a directory in PATH
-```
 
 ### Via Install Script
 
