@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use color_eyre::eyre::Result;
 
 use crate::api::LighthouseAPIClient;
@@ -132,11 +134,16 @@ pub async fn validate_all(include_passed: bool, _detailed: bool) -> Result<()> {
         ui.task_separator(i + 1, total_tasks, &task.slug);
 
         // run validators and submit results (pass state for auto-refresh)
+        let workspace = state
+            .get_active()
+            .map(|l| PathBuf::from(&l.workspace));
+
         run_task_validators(
             &client,
             &lab.slug,
             task,
             Some((&mut state, &token)),
+            workspace,
         )
         .await?;
     }

@@ -11,8 +11,12 @@ pub async fn execute(probe: &ExecProbe, ctx: &Context) -> Result<ProbeResult, Ex
 
     let start = Instant::now();
 
-    let output = Command::new(&command)
-        .args(&args)
+    let mut cmd = Command::new(&command);
+    cmd.args(&args);
+    if let Some(ref ws) = ctx.workspace {
+        cmd.current_dir(ws);
+    }
+    let output = cmd
         .output()
         .await
         .map_err(|e| ExecutionError::new(format!("failed to execute '{}': {}", command, e)))?;

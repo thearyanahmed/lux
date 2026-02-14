@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use blueprint::reporter::CliReporter;
 use color_eyre::eyre::Result;
 
@@ -79,11 +81,16 @@ pub async fn run(task_id: &str, lab_slug: Option<&str>, _detailed: bool) -> Resu
         }
     };
 
+    let workspace = state
+        .get_active()
+        .map(|l| PathBuf::from(&l.workspace));
+
     run_task_validators(
         &client,
         &lab_data.slug,
         task_data,
         Some((&mut state, &token)),
+        workspace,
     )
     .await
 }
@@ -95,10 +102,11 @@ pub async fn run_task_validators(
     lab_slug: &str,
     task: &Task,
     state_ctx: Option<(&mut LabState, &str)>,
+    workspace: Option<PathBuf>,
 ) -> Result<()> {
     match blueprint_runner::detect_system(task) {
         TaskSystem::Blueprint(source) => {
-            run_blueprint_task(client, lab_slug, task, source, state_ctx).await
+            run_blueprint_task(client, lab_slug, task, source, state_ctx, workspace).await
         }
         TaskSystem::None => {
             let ui = RunUI::new(&task.slug, 0);
@@ -117,6 +125,7 @@ async fn run_blueprint_task(
     task: &Task,
     bp_source: &str,
     state_ctx: Option<(&mut LabState, &str)>,
+    workspace: Option<PathBuf>,
 ) -> Result<()> {
     let ui = RunUI::new(&task.slug, 0);
 
@@ -147,7 +156,7 @@ async fn run_blueprint_task(
 
     ui.step("Running blueprint...");
 
-    let bp_result = match blueprint_runner::run_validate(bp_source, &task.slug).await {
+    let bp_result = match blueprint_runner::run_validate(bp_source, &task.slug, workspace).await {
         Ok(r) => r,
         Err(err) => {
             oops!("blueprint failed: {}", err);

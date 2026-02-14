@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use color_eyre::eyre::{Result, WrapErr};
 
@@ -27,7 +28,11 @@ pub fn detect_system(task: &Task) -> TaskSystem<'_> {
 }
 
 /// run a blueprint in Validate mode (probe-only, no user inputs)
-pub async fn run_validate(bp_source: &str, task_slug: &str) -> Result<BlueprintResult> {
+pub async fn run_validate(
+    bp_source: &str,
+    task_slug: &str,
+    workspace: Option<PathBuf>,
+) -> Result<BlueprintResult> {
     let ast = parse(bp_source)
         .map_err(|e| color_eyre::eyre::eyre!("parse error at line {}: {}", e.line, e.message))?;
 
@@ -39,7 +44,10 @@ pub async fn run_validate(bp_source: &str, task_slug: &str) -> Result<BlueprintR
         color_eyre::eyre::eyre!("transpile error: {}", msg)
     })?;
 
-    let ctx = Context::new(bp.config.clone(), ExecutionMode::Validate);
+    let mut ctx = Context::new(bp.config.clone(), ExecutionMode::Validate);
+    if let Some(ws) = workspace {
+        ctx = ctx.with_workspace(ws);
+    }
     let mut engine = Engine::new(ctx).with_task(task_slug);
 
     let result = engine
@@ -55,6 +63,7 @@ pub async fn run_result(
     bp_source: &str,
     task_slug: &str,
     user_inputs: &HashMap<String, String>,
+    workspace: Option<PathBuf>,
 ) -> Result<BlueprintResult> {
     let ast = parse(bp_source)
         .map_err(|e| color_eyre::eyre::eyre!("parse error at line {}: {}", e.line, e.message))?;
@@ -68,6 +77,9 @@ pub async fn run_result(
     })?;
 
     let mut ctx = Context::new(bp.config.clone(), ExecutionMode::Result);
+    if let Some(ws) = workspace {
+        ctx = ctx.with_workspace(ws);
+    }
     for (key, value) in user_inputs {
         ctx.set_user_input(key, value);
     }
@@ -253,7 +265,7 @@ mod tests {
             file_path.display()
         );
 
-        let result = run_validate(&bp_source, "test-task").await.unwrap();
+        let result = run_validate(&bp_source, "test-task", None).await.unwrap();
         assert!(matches!(result.status, Status::Passed));
     }
 
@@ -268,13 +280,13 @@ mod tests {
     }
 }"#;
 
-        let result = run_validate(bp_source, "test-task").await.unwrap();
+        let result = run_validate(bp_source, "test-task", None).await.unwrap();
         assert!(matches!(result.status, Status::Failed));
     }
 
     #[tokio::test]
     async fn test_run_validate_parse_error() {
-        let result = run_validate("not valid blueprint syntax {{{", "test-task").await;
+        let result = run_validate("not valid blueprint syntax {{{", "test-task", None).await;
         assert!(result.is_err());
     }
 }

@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use blueprint::reporter::CliReporter;
 use color_eyre::eyre::Result;
 
@@ -76,6 +78,9 @@ pub async fn result(task_id: &str, inputs: &[String], lab_slug: Option<&str>) ->
 
     let bp_source = task_data.blueprint.as_deref().unwrap_or_default();
     let user_inputs = blueprint_runner::parse_inputs(inputs)?;
+    let workspace = state
+        .get_active()
+        .map(|l| PathBuf::from(&l.workspace));
 
     let ui = RunUI::new(&task_data.slug, 0);
     ui.header();
@@ -100,7 +105,9 @@ pub async fn result(task_id: &str, inputs: &[String], lab_slug: Option<&str>) ->
     ui.step("Running blueprint (result mode)...");
 
     let bp_result =
-        match blueprint_runner::run_result(bp_source, &task_data.slug, &user_inputs).await {
+        match blueprint_runner::run_result(bp_source, &task_data.slug, &user_inputs, workspace)
+            .await
+        {
             Ok(r) => r,
             Err(err) => {
                 oops!("blueprint failed: {}", err);

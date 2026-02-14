@@ -1,5 +1,6 @@
 use crate::transpiler::ir::{Config, Value};
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 /// runtime execution context — holds captured variables, config, and user inputs
 #[derive(Debug, Clone)]
@@ -8,6 +9,8 @@ pub struct Context {
     pub variables: HashMap<String, Value>,
     pub user_inputs: HashMap<String, String>,
     pub mode: ExecutionMode,
+    /// working directory for exec probes (lab workspace path)
+    pub workspace: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,7 +28,13 @@ impl Context {
             variables: HashMap::new(),
             user_inputs: HashMap::new(),
             mode,
+            workspace: None,
         }
+    }
+
+    pub fn with_workspace(mut self, path: PathBuf) -> Self {
+        self.workspace = Some(path);
+        self
     }
 
     pub fn set_variable(&mut self, name: &str, value: Value) {
