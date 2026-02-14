@@ -1,8 +1,8 @@
 # blueprint
 
-An inspection engine for [luxctl](../../README.md). Blueprint parses a custom DSL (`.bp` files), probes the state of the world (ports, HTTP endpoints, processes, files, command output), and reports whether the student's work matches expectations.
+An inspection engine for [luxctl](../../README.md). Blueprint parses a custom DSL (`.bp` files), probes the state of the world (ports, HTTP endpoints, processes, files, command output), and reports whether the results match expectations.
 
-**Blueprint inspects, it does not act.** The student does the work — starts servers, creates containers, writes code. Blueprint observes what's there and reports pass/fail.
+**Blueprint inspects, it does not act.** The user does the work — starts servers, creates containers, writes code. Blueprint observes what's there and reports pass/fail.
 
 ## Pipeline
 
