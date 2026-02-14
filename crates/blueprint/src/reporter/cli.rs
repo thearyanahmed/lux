@@ -3,8 +3,10 @@ use colored::Colorize;
 
 pub struct CliReporter;
 
+const DETAIL_LINE_WIDTH: usize = 60;
+
 impl CliReporter {
-    pub fn print_result(result: &BlueprintResult) {
+    pub fn print_result(result: &BlueprintResult, detailed: bool) {
         println!();
 
         for phase in &result.phases {
@@ -14,32 +16,15 @@ impl CliReporter {
             }
 
             for step in &phase.steps {
-                match &step.status {
-                    Status::Passed => {
-                        println!("  {} {}", "✓".green(), step.name);
-                    }
-                    Status::Failed => {
-                        println!("  {} {}", "✗".red(), step.name.red());
-                        for exp in &step.expectations {
-                            if exp.status == Status::Failed {
-                                if let Some(msg) = &exp.message {
-                                    println!("    {}", msg.dimmed());
-                                }
-                            }
-                        }
-                    }
-                    Status::Skipped => {
-                        println!("  {} {}", "⊘".dimmed(), step.name.dimmed());
-                    }
-                    Status::Error(msg) => {
-                        println!("  {} {} — {}", "!".yellow(), step.name.yellow(), msg);
-                    }
-                }
+                Self::render_step(step, detailed);
+            }
 
-                // show captured values
-                for (var, val) in &step.captures {
-                    println!("    {} = {}", var.cyan(), val);
-                }
+            if detailed {
+                let label = format!("phase \"{}\"", phase.name);
+                let suffix = format!("{}ms", phase.duration_ms);
+                let gap = right_align_gap(2 + label.len(), suffix.len());
+                println!();
+                println!("  {}{}{}", label.dimmed(), gap, suffix.dimmed());
             }
         }
 
@@ -72,17 +57,41 @@ impl CliReporter {
     }
 
     /// print a single step result (for --task targeting)
-    pub fn print_step_result(step: &StepResult) {
+    pub fn print_step_result(step: &StepResult, detailed: bool) {
+        Self::render_step(step, detailed);
+    }
+
+    fn render_step(step: &StepResult, detailed: bool) {
         match &step.status {
             Status::Passed => {
-                println!("  {} {}", "✓".green(), step.name);
+                if detailed {
+                    let suffix = step_suffix(step);
+                    let gap = right_align_gap(4 + step.name.len(), suffix.len());
+                    println!("  {} {}{}{}", "✓".green(), step.name, gap, suffix.dimmed());
+                    print_expectations(&step.expectations);
+                } else {
+                    println!("  {} {}", "✓".green(), step.name);
+                }
             }
             Status::Failed => {
-                println!("  {} {}", "✗".red(), step.name.red());
-                for exp in &step.expectations {
-                    if exp.status == Status::Failed {
-                        if let Some(msg) = &exp.message {
-                            println!("    {}", msg.dimmed());
+                if detailed {
+                    let suffix = step_suffix(step);
+                    let gap = right_align_gap(4 + step.name.len(), suffix.len());
+                    println!(
+                        "  {} {}{}{}",
+                        "✗".red(),
+                        step.name.red(),
+                        gap,
+                        suffix.dimmed()
+                    );
+                    print_expectations(&step.expectations);
+                } else {
+                    println!("  {} {}", "✗".red(), step.name.red());
+                    for exp in &step.expectations {
+                        if exp.status == Status::Failed {
+                            if let Some(msg) = &exp.message {
+                                println!("    {}", msg.dimmed());
+                            }
                         }
                     }
                 }
@@ -123,6 +132,78 @@ impl CliReporter {
         println!();
         println!("  {}", "Incorrect.".red().bold());
         println!();
+    }
+}
+
+fn right_align_gap(left_len: usize, right_len: usize) -> String {
+    let total = left_len + right_len;
+    if total >= DETAIL_LINE_WIDTH {
+        "  ".to_string()
+    } else {
+        " ".repeat(DETAIL_LINE_WIDTH - total)
+    }
+}
+
+fn step_suffix(step: &StepResult) -> String {
+    if step.retry_count > 0 {
+        format!("{}ms  retry {}", step.duration_ms, step.retry_count)
+    } else {
+        format!("{}ms", step.duration_ms)
+    }
+}
+
+fn format_op_symbol(op: &Op) -> &str {
+    match op {
+        Op::Eq => "=",
+        Op::Contains => "contains",
+        Op::StartsWith => "starts_with",
+        Op::Matches => "~",
+        Op::MatchesFile => "matches_file",
+        Op::Present => "present",
+        Op::Absent => "absent",
+        Op::Gt => ">",
+        Op::Lt => "<",
+        Op::Gte => ">=",
+        Op::Lte => "<=",
+        Op::All => "all",
+    }
+}
+
+fn format_expectation_desc(exp: &ExpectResult) -> String {
+    let op = format_op_symbol(&exp.op);
+    let actual_display = exp
+        .actual
+        .as_ref()
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "?".to_string());
+
+    match exp.op {
+        Op::Present | Op::Absent => format!("{} {}", exp.field, op),
+        Op::Contains | Op::StartsWith | Op::Matches | Op::MatchesFile | Op::All => {
+            format!(
+                "{} {} \"{}\" (actual: \"{}\")",
+                exp.field, op, exp.expected_display, actual_display
+            )
+        }
+        _ => {
+            format!(
+                "{} {} {} (expected: {})",
+                exp.field, op, actual_display, exp.expected_display
+            )
+        }
+    }
+}
+
+fn print_expectations(expectations: &[ExpectResult]) {
+    for exp in expectations {
+        let desc = format_expectation_desc(exp);
+        let symbol = match &exp.status {
+            Status::Passed => "✓".green(),
+            Status::Failed => "✗".red(),
+            _ => "·".dimmed(),
+        };
+        let gap = right_align_gap(4 + desc.len(), 1);
+        println!("    {}{}{}", desc.dimmed(), gap, symbol);
     }
 }
 
@@ -183,7 +264,7 @@ mod tests {
     #[test]
     fn test_print_passed_result() {
         let result = make_passed_result();
-        CliReporter::print_result(&result);
+        CliReporter::print_result(&result, false);
     }
 
     #[test]
@@ -216,6 +297,6 @@ mod tests {
             captured: std::collections::HashMap::new(),
             input_provided: std::collections::HashMap::new(),
         };
-        CliReporter::print_result(&result);
+        CliReporter::print_result(&result, false);
     }
 }

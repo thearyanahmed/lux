@@ -13,7 +13,7 @@ use crate::{complain, oops, say};
 
 /// handle `luxctl run --task <slug|number> [--lab <slug>]`
 /// task can be specified by slug or by number (1, 01, 2, 02, etc.)
-pub async fn run(task_id: &str, lab_slug: Option<&str>, _detailed: bool) -> Result<()> {
+pub async fn run(task_id: &str, lab_slug: Option<&str>, detailed: bool) -> Result<()> {
     let config = Config::load()?;
     if !config.has_auth_token() {
         oops!("not authenticated. Run: `luxctl auth --token $token`");
@@ -91,6 +91,7 @@ pub async fn run(task_id: &str, lab_slug: Option<&str>, _detailed: bool) -> Resu
         task_data,
         Some((&mut state, &token)),
         workspace,
+        detailed,
     )
     .await
 }
@@ -103,10 +104,12 @@ pub async fn run_task_validators(
     task: &Task,
     state_ctx: Option<(&mut LabState, &str)>,
     workspace: Option<PathBuf>,
+    detailed: bool,
 ) -> Result<()> {
     match blueprint_runner::detect_system(task) {
         TaskSystem::Blueprint(source) => {
-            run_blueprint_task(client, lab_slug, task, source, state_ctx, workspace).await
+            run_blueprint_task(client, lab_slug, task, source, state_ctx, workspace, detailed)
+                .await
         }
         TaskSystem::None => {
             let ui = RunUI::new(&task.slug, 0);
@@ -126,6 +129,7 @@ async fn run_blueprint_task(
     bp_source: &str,
     state_ctx: Option<(&mut LabState, &str)>,
     workspace: Option<PathBuf>,
+    detailed: bool,
 ) -> Result<()> {
     let ui = RunUI::new(&task.slug, 0);
 
@@ -165,7 +169,7 @@ async fn run_blueprint_task(
         }
     };
 
-    CliReporter::print_result(&bp_result);
+    CliReporter::print_result(&bp_result, detailed);
 
     // submit attempt
     let attempt_request = blueprint_runner::to_attempt_request(&bp_result, lab_slug, task.id);

@@ -115,7 +115,7 @@ pub async fn result(task_id: &str, inputs: &[String], lab_slug: Option<&str>) ->
             }
         };
 
-    CliReporter::print_result(&bp_result);
+    CliReporter::print_result(&bp_result, false);
 
     // submit attempt
     let attempt_request =
