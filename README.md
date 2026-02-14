@@ -46,8 +46,14 @@ luxctl task show --task 1
 # run validation
 luxctl run --task 1
 
+# run with verbose per-expectation output
+luxctl run --task 1 --detailed
+
 # validate all tasks
 luxctl validate
+
+# validate all with verbose output
+luxctl validate --detailed
 
 # get hints (costs points)
 luxctl hint list --task 1
