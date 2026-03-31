@@ -1,4 +1,5 @@
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand, ValueHint};
+use clap_complete::{generate, Shell};
 use color_eyre::eyre::Result;
 
 use luxctl::{
@@ -74,6 +75,7 @@ enum Commands {
     /// Parse a .bp file and print the transpiled IR as JSON (offline, no auth)
     Export {
         /// Path to the .bp file
+        #[arg(value_hint = ValueHint::FilePath)]
         file: String,
 
         /// Output format
@@ -108,6 +110,13 @@ enum Commands {
     /// Print the current version
     Version,
 
+    /// Generate shell completions for luxctl
+    Completions {
+        /// Shell to generate completions for
+        #[arg(value_enum)]
+        shell: Shell,
+    },
+
     /// Project-specific helper tools (e.g., data generators)
     Helper {
         /// Helper name (e.g., 1brc)
@@ -118,11 +127,11 @@ enum Commands {
         rows: u64,
 
         /// Measurements output file
-        #[arg(short = 'm', long, default_value = "data/measurements.txt")]
+        #[arg(short = 'm', long, default_value = "data/measurements.txt", value_hint = ValueHint::FilePath)]
         measurements: String,
 
         /// Expected output file
-        #[arg(short = 'e', long, default_value = "expected/output.txt")]
+        #[arg(short = 'e', long, default_value = "expected/output.txt", value_hint = ValueHint::FilePath)]
         expected: String,
     },
 }
@@ -147,7 +156,7 @@ enum ProjectAction {
         id: String,
 
         /// Workspace directory (defaults to current directory)
-        #[arg(short = 'w', long, default_value = ".")]
+        #[arg(short = 'w', long, default_value = ".", value_hint = ValueHint::DirPath)]
         workspace: String,
 
         /// Runtime environment (go, rust, c)
@@ -165,7 +174,7 @@ enum ProjectAction {
         runtime: Option<String>,
 
         /// Workspace directory
-        #[arg(short = 'w', long)]
+        #[arg(short = 'w', long, value_hint = ValueHint::DirPath)]
         workspace: Option<String>,
     },
     /// Start fresh - reset all progress on the current project
@@ -218,7 +227,7 @@ enum TerminalAction {
         slug: String,
 
         /// Workspace directory (defaults to current directory)
-        #[arg(short = 'w', long, default_value = ".")]
+        #[arg(short = 'w', long, default_value = ".", value_hint = ValueHint::DirPath)]
         workspace: String,
 
         /// Language (go, rust, c) — selects which test files to inject
@@ -448,6 +457,10 @@ async fn main() -> Result<()> {
 
         Commands::Version => {
             println!("luxctl v{VERSION}");
+        }
+
+        Commands::Completions { shell } => {
+            generate(shell, &mut Cli::command(), "luxctl", &mut std::io::stdout());
         }
 
         Commands::Helper {

@@ -185,6 +185,15 @@ luxctl doctor
 luxctl version
 ```
 
+### Shell Completions
+
+```bash
+# generate completions for your shell
+echo 'eval "$(luxctl completions bash)"' >> ~/.bashrc
+echo 'eval "$(luxctl completions zsh)"' >> ~/.zshrc
+echo 'luxctl completions fish | source' >> ~/.config/fish/config.fish
+```
+
 ## Development
 
 ```bash
