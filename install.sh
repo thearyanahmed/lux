@@ -143,7 +143,8 @@ download_binary() {
 }
 
 install_via_cargo() {
-    info "No pre-built binary for ${PLATFORM}/${ARCH}, falling back to cargo install..."
+    error "No pre-built binary available for ${PLATFORM}/${ARCH}. Please open an issue: https://github.com/${REPO}/issues"
+    # cargo install builds without the production client secret, so API calls will fail with HTTP 403.
 
     if ! check_cmd cargo; then
         info "Rust not found. Installing via rustup..."

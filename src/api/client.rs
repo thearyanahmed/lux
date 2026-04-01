@@ -153,11 +153,12 @@ impl LighthouseAPIClient {
         let response = request.send().await?;
 
         if !response.status().is_success() {
+            let status = response.status();
             let error_text = response.text().await?;
             let message = serde_json::from_str::<ApiError>(&error_text)
                 .map(|e| e.message)
                 .unwrap_or(error_text);
-            return Err(eyre!("{}", message));
+            return Err(eyre!("[HTTP {}] {}", status.as_u16(), message));
         }
 
         let data = response.json::<T>().await?;
@@ -183,11 +184,12 @@ impl LighthouseAPIClient {
         let response = request.send().await?;
 
         if !response.status().is_success() {
+            let status = response.status();
             let error_text = response.text().await?;
             let message = serde_json::from_str::<ApiError>(&error_text)
                 .map(|e| e.message)
                 .unwrap_or(error_text);
-            return Err(eyre!("{}", message));
+            return Err(eyre!("[HTTP {}] {}", status.as_u16(), message));
         }
 
         let data = response.json::<T>().await?;

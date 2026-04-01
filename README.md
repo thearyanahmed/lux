@@ -20,13 +20,13 @@ curl -fsSL https://raw.githubusercontent.com/thearyanahmed/luxctl/master/install
 
 ### Via Cargo
 
-```bash
-# latest version
-cargo install luxctl
-
-# specific version
-cargo install luxctl --version 0.10.1
-```
+> **Note:** `cargo install luxctl` builds from source without the production client secret,
+> so API requests will be rejected with HTTP 403. Use the install script or pre-built binaries instead.
+> If you need to build from source, set `LUXCTL_CLIENT_SECRET` at compile time. This is for development only, if you can mock
+> projectlighthouse.io's api.
+> ```bash
+> LUXCTL_CLIENT_SECRET="<secret>" cargo install luxctl
+> ```
 
 ## Upgrade
 
