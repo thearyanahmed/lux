@@ -2,6 +2,7 @@ use color_eyre::eyre::Result;
 
 use crate::api::LighthouseAPIClient;
 use crate::config::Config;
+use crate::projectfiles;
 use crate::state::ProjectState;
 use crate::ui::UI;
 
@@ -56,6 +57,21 @@ pub async fn start(slug: &str, workspace: &str, runtime: Option<&str>) -> Result
     if let Some(rt) = runtime {
         UI::kv("runtime", rt);
     }
+
+    // fetch fixture files from projectfiles repo
+    match projectfiles::download_fixtures(&project.slug, &canonical).await {
+        Ok(true) => {
+            UI::success("project files synced");
+        }
+        Ok(false) => {
+            log::debug!("no fixtures available for '{}'", project.slug);
+        }
+        Err(e) => {
+            log::debug!("fixture download failed: {}", e);
+            UI::note("run `luxctl sync` to retry downloading project files");
+        }
+    }
+
     UI::note("run `luxctl task list` to see available tasks");
 
     Ok(())

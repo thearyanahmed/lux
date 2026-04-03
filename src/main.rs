@@ -93,6 +93,9 @@ enum Commands {
         action: TerminalAction,
     },
 
+    /// Download or refresh fixture files for the active project
+    Sync,
+
     /// Upgrade luxctl to the latest version (or a specific version)
     Upgrade {
         /// Target version (e.g. v0.9.2). Defaults to latest release.
@@ -430,6 +433,10 @@ async fn main() -> Result<()> {
                 commands::hints::unlock(&task, &hint).await?;
             }
         },
+
+        Commands::Sync => {
+            commands::sync::run().await?;
+        }
 
         Commands::Upgrade { version } => {
             commands::upgrade::run(version).await?;
