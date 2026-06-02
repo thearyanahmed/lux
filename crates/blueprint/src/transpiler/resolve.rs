@@ -201,7 +201,12 @@ fn resolve_step(block: &crate::parser::ast::Block) -> Result<Step, TranspileErro
         }
     }
 
-    let probe = probe.ok_or_else(|| TranspileError::new(format!("step '{name}' has no probe")))?;
+    let mut probe =
+        probe.ok_or_else(|| TranspileError::new(format!("step '{name}' has no probe")))?;
+
+    if let Probe::Http(http_probe) = &mut probe {
+        http_probe.headers = std::mem::take(&mut headers);
+    }
 
     Ok(Step {
         name,
@@ -910,6 +915,36 @@ blueprint "T" {
             }
             other => panic!("expected HttpProbe, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_http_step_headers_are_moved_into_probe_headers() {
+        let bp = transpile_str(
+            r#"
+blueprint "T" {
+    phase "r" {
+        step "root" {
+            probe http GET /
+            headers { User-Agent: test-agent/1.0 }
+            expect { status: 200 }
+        }
+    }
+}
+"#,
+        )
+        .unwrap_or_else(|e| panic!("{e}"));
+
+        let step = &bp.phases[0].steps[0];
+        match &step.probe {
+            Probe::Http(p) => {
+                assert_eq!(
+                    p.headers.get("User-Agent").map(|s| s.as_str()),
+                    Some("test-agent/1.0")
+                );
+            }
+            other => panic!("expected HttpProbe, got {other:?}"),
+        }
+        assert!(step.headers.is_empty());
     }
 
     #[test]
