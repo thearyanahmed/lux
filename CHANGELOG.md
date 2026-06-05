@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.13.0] - 2026-06-05
+
+### Added
+
+- Shell completions via `luxctl completions <bash|zsh|fish>`. `ValueHint` annotations on file/dir args for richer tab completion.
+
 ## [0.12.0] - 2026-06-05
 
 ### Fixed
