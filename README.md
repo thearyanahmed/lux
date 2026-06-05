@@ -35,7 +35,7 @@ curl -fsSL https://raw.githubusercontent.com/thearyanahmed/luxctl/master/install
 luxctl upgrade
 
 # upgrade to specific version
-luxctl upgrade v0.10.1
+luxctl upgrade v0.12.0
 ```
 
 ## Quick Start
@@ -234,7 +234,7 @@ Releases are automated via GitHub Actions. To create a new release:
 4. Wait for Auto Tag workflow to create the version tag
 5. Trigger the Release workflow:
    ```bash
-   gh workflow run Release --field tag=v0.10.1
+   gh workflow run Release --field tag=v0.12.0
    ```
 
 The Release workflow will:

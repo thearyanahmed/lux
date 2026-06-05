@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.0] - 2026-06-05
+
+### Fixed
+
+- HTTP probe now sends step-scope `headers { ... }` block. Transpiler moves `Step.headers` into `HttpProbe.headers` so executor includes them in requests.
+
 ## [0.5.5] - 2026-01-18
 
 ### Changed
