@@ -307,7 +307,10 @@ impl DockerExecutor {
                 }
             };
 
-        let options = LogsOptionsBuilder::default().stdout(true).build();
+        let options = LogsOptionsBuilder::default()
+            .stderr(true)
+            .stdout(true)
+            .build();
 
         let mut log_stream = self.docker.logs(&id, Some(options));
 
