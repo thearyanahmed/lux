@@ -64,8 +64,6 @@ impl DockerExecutor {
         let url = format!("{}/{}", DOCKERFILE_BASE_URL, name);
         let cache_path = self.cache_dir.join(name);
 
-        eprintln!("DEBUG fetching: {}", url);
-
         // fetch from GitHub
         let response = reqwest::get(&url)
             .await
