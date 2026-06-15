@@ -126,7 +126,7 @@ async fn check_network(config: &Option<Config>) {
     let client = LighthouseAPIClient::from_config(config);
     match client.me().await {
         Ok(user) => {
-            UI::ok("api", Some(&format!("connected as {}", user.email)));
+            UI::ok("api", Some(&format!("connected as @{}", user.name)));
         }
         Err(e) => {
             UI::error("api", Some(&format!("{}", e)));
@@ -229,7 +229,10 @@ fn check_project_state(config: &Option<Config>) {
         if workspace_path.exists() {
             UI::ok("workspace", Some(&project.workspace));
         } else {
-            UI::error("workspace", Some(&format!("{} (not found)", project.workspace)));
+            UI::error(
+                "workspace",
+                Some(&format!("{} (not found)", project.workspace)),
+            );
         }
 
         if let Some(rt) = &project.runtime {
