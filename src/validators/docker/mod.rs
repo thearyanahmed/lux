@@ -7,6 +7,6 @@ mod executor;
 pub mod registry;
 mod validator;
 
-pub use executor::{DockerExecutor, ExecutorResult};
+pub use executor::{is_docker_available, DockerExecutor, ExecutorResult};
 pub use registry::{lookup as lookup_image, ImageSource, RegisteredImage};
 pub use validator::{DockerValidator, Expectation};

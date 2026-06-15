@@ -107,7 +107,7 @@ impl DockerExecutor {
         })?;
 
         // check docker availability
-        if !self.is_docker_available().await {
+        if !is_docker_available().await {
             return Err("docker not available".to_string());
         }
 
@@ -355,7 +355,6 @@ impl DockerExecutor {
         Ok(())
     }
 
-    /// check if docker is available
     pub async fn is_docker_available(&self) -> bool {
         self.docker.version().await.is_ok()
     }
@@ -402,6 +401,14 @@ impl DockerExecutor {
     }
 }
 
+/// check if docker is available
+pub async fn is_docker_available() -> bool {
+    match Docker::connect_with_local_defaults() {
+        Ok(docker) => docker.version().await.is_ok(),
+        Err(_) => false,
+    }
+}
+
 /// sanitize a string to be valid in a docker image tag
 /// docker tags can only contain lowercase letters, digits, underscores, periods, and hyphens
 fn sanitize_for_docker_tag(s: &str) -> String {
@@ -441,8 +448,7 @@ mod tests {
     #[tokio::test]
     async fn test_is_docker_available_returns_bool() {
         // just verify it doesn't panic
-        let executor = DockerExecutor::new().unwrap();
-        let _ = executor.is_docker_available().await;
+        let _ = is_docker_available().await;
     }
 
     #[tokio::test]
