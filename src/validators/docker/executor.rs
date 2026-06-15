@@ -64,6 +64,8 @@ impl DockerExecutor {
         let url = format!("{}/{}", DOCKERFILE_BASE_URL, name);
         let cache_path = self.cache_dir.join(name);
 
+        eprintln!("DEBUG fetching: {}", url);
+
         // fetch from GitHub
         let response = reqwest::get(&url)
             .await
@@ -492,5 +494,42 @@ mod tests {
             "api-client-test"
         );
         assert_eq!(sanitize_for_docker_tag("test_image"), "test_image");
+    }
+
+    #[test]
+    fn test_tarball_contains_dockerfile() {
+        use flate2::read::GzDecoder;
+        use std::io::Write;
+
+        let tmp = std::env::temp_dir().join("luxctl_test_ctx");
+        std::fs::create_dir_all(&tmp).unwrap();
+        let dockerfile = tmp.join("Dockerfile.test");
+        let mut f = std::fs::File::create(&dockerfile).unwrap();
+        writeln!(f, "FROM alpine:latest").unwrap();
+        writeln!(f, "RUN echo hello").unwrap();
+
+        let executor = match DockerExecutor::new() {
+            Ok(e) => e,
+            Err(_) => return,
+        };
+
+        let tar_gz = executor
+            .build_context_tarball(&dockerfile, tmp.to_str().unwrap())
+            .expect("tarball should build");
+
+        let decoder = GzDecoder::new(&tar_gz[..]);
+        let mut archive = tar::Archive::new(decoder);
+        let mut found_dockerfile = false;
+        for entry in archive.entries().unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path().unwrap();
+            if path.to_str() == Some("Dockerfile") {
+                found_dockerfile = true;
+            }
+        }
+
+        assert!(found_dockerfile, "tar must contain a Dockerfile entry");
+
+        std::fs::remove_dir_all(&tmp).ok();
     }
 }
