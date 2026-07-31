@@ -1,4 +1,4 @@
-use crate::executor::context::{Context, ExecutionMode};
+use crate::executor::context::{Context, ExecutionMode, HostFacts};
 use crate::executor::error::ExecutionError;
 use crate::executor::expect::{evaluate_expectations, evaluate_input, process_captures};
 use crate::executor::probes::execute_probe;
@@ -86,7 +86,10 @@ impl Engine {
         if let Some(ref slug) = self.task_slug {
             if let Some(ref phase_slug) = phase.meta.slug {
                 if phase_slug != slug {
-                    debug!("  skipping phase (slug mismatch: want={}, got={})", slug, phase_slug);
+                    debug!(
+                        "  skipping phase (slug mismatch: want={}, got={})",
+                        slug, phase_slug
+                    );
                     return Ok(PhaseResult {
                         name: phase.name.clone(),
                         slug: phase.meta.slug.clone(),
@@ -113,19 +116,28 @@ impl Engine {
             let has_input = !step.inputs.is_empty();
             match self.ctx.mode {
                 ExecutionMode::Validate if has_input => {
-                    step_results.push(skipped_step(&step.name));
+                    step_results.push(skipped_step(&step.name, None));
                     continue;
                 }
                 ExecutionMode::Result if !has_input => {
-                    step_results.push(skipped_step(&step.name));
+                    step_results.push(skipped_step(&step.name, None));
                     continue;
                 }
                 _ => {}
             }
 
             if step.requires.iter().any(|var| !self.ctx.has_variable(var)) {
-                step_results.push(skipped_step(&step.name));
+                step_results.push(skipped_step(&step.name, None));
                 continue;
+            }
+
+            // host-conditional steps skip with an explanation rather than
+            // failing — the parity claim only stays credible if we say why
+            if let Some(reqs) = &step.requires_env {
+                if let Some(reason) = unmet_requirement(reqs, self.ctx.facts.as_ref()) {
+                    step_results.push(skipped_step(&step.name, Some(reason)));
+                    continue;
+                }
             }
 
             if has_input && self.ctx.mode == ExecutionMode::Result {
@@ -182,6 +194,7 @@ impl Engine {
             input_matched: None,
             duration_ms: 0,
             retry_count: max_attempts,
+            skip_reason: None,
         }))
     }
 
@@ -213,6 +226,7 @@ impl Engine {
                         input_matched: None,
                         duration_ms: start.elapsed().as_millis() as u64,
                         retry_count: attempt,
+                        skip_reason: None,
                     });
                 }
             }
@@ -267,11 +281,12 @@ impl Engine {
             input_matched,
             duration_ms: start.elapsed().as_millis() as u64,
             retry_count: attempt,
+            skip_reason: None,
         })
     }
 }
 
-fn skipped_step(name: &str) -> StepResult {
+fn skipped_step(name: &str, reason: Option<String>) -> StepResult {
     StepResult {
         name: name.to_string(),
         status: Status::Skipped,
@@ -280,7 +295,62 @@ fn skipped_step(name: &str) -> StepResult {
         input_matched: None,
         duration_ms: 0,
         retry_count: 0,
+        skip_reason: reason,
     }
+}
+
+/// check declared requirements against what the backend actually provides.
+///
+/// returns the reason the step cannot run, or `None` when it can. an absent
+/// `HostFacts` means nobody ran preflight — local runs — so host-conditional
+/// requirements are the only ones we can honestly judge.
+fn unmet_requirement(reqs: &Requirements, facts: Option<&HostFacts>) -> Option<String> {
+    let facts = match facts {
+        Some(f) => f,
+        None => {
+            let host = reqs.host.as_deref()?;
+            return (host != std::env::consts::OS)
+                .then(|| format!("requires a {host} host, this is {}", std::env::consts::OS));
+        }
+    };
+
+    if let Some(host) = &reqs.host {
+        if host != &facts.host_os {
+            return Some(format!("requires a {host} host, this is {}", facts.host_os));
+        }
+    }
+    if let Some((maj, min, patch)) = reqs.kernel {
+        match facts.kernel {
+            Some(actual) if actual >= (maj, min, patch) => {}
+            Some((a, b, c)) => {
+                return Some(format!(
+                    "needs kernel >={maj}.{min}.{patch}, {} has {a}.{b}.{c}",
+                    facts.backend
+                ))
+            }
+            None => return Some(format!("kernel version unknown on {}", facts.backend)),
+        }
+    }
+    if reqs.cgroup_v2 && !facts.cgroup_v2 {
+        return Some(format!(
+            "needs a cgroup v2 unified hierarchy, {} does not provide one",
+            facts.backend
+        ));
+    }
+    if reqs.userns && !facts.userns {
+        return Some(format!(
+            "needs user namespaces, {} lacks them",
+            facts.backend
+        ));
+    }
+    if reqs.btf && !facts.btf {
+        return Some(format!(
+            "needs BTF at /sys/kernel/btf/vmlinux, {} does not expose it",
+            facts.backend
+        ));
+    }
+
+    None
 }
 
 #[cfg(test)]
@@ -436,6 +506,117 @@ blueprint "T" {
         )
         .await;
         assert_eq!(r.phases[0].steps[0].status, Status::Skipped);
+        assert!(
+            r.phases[0].steps[0].skip_reason.is_none(),
+            "a missing variable is not a host-capability skip"
+        );
+    }
+
+    fn facts(backend: &str) -> HostFacts {
+        HostFacts {
+            host_os: "linux".to_string(),
+            backend: backend.to_string(),
+            kernel: Some((5, 15, 0)),
+            cgroup_v2: true,
+            userns: true,
+            btf: false,
+        }
+    }
+
+    async fn run_with_facts(input: &str, facts: Option<HostFacts>) -> BlueprintResult {
+        let ast = parse(input).unwrap_or_else(|e| panic!("parse: {e}"));
+        let bp = transpile(&ast).unwrap_or_else(|e| panic!("transpile: {e}"));
+        let mut ctx = Context::new(bp.config.clone(), ExecutionMode::Validate);
+        if let Some(f) = facts {
+            ctx = ctx.with_facts(f);
+        }
+        Engine::new(ctx)
+            .execute(&bp)
+            .await
+            .unwrap_or_else(|e| panic!("execute: {e}"))
+    }
+
+    const NEEDS_NEW_KERNEL: &str = r#"
+blueprint "T" {
+    phase "t" {
+        step "ebpf" {
+            requires { kernel: ">=6.1"  btf: true }
+            probe exec echo "hello"
+            expect { exit: 0 }
+        }
+        step "ordinary" {
+            probe exec echo "hello"
+            expect { exit: 0 }
+        }
+    }
+}
+"#;
+
+    /// an unmet host requirement skips *with an explanation*, and does not drag
+    /// the rest of the run down with it
+    #[tokio::test]
+    async fn test_requires_env_skips_with_reason() {
+        let r = run_with_facts(NEEDS_NEW_KERNEL, Some(facts("colima"))).await;
+
+        let skipped = &r.phases[0].steps[0];
+        assert_eq!(skipped.status, Status::Skipped);
+        let reason = skipped
+            .skip_reason
+            .as_deref()
+            .unwrap_or_else(|| panic!("skip carried no reason"));
+        assert!(
+            reason.contains("6.1"),
+            "reason should name the requirement: {reason}"
+        );
+        assert!(
+            reason.contains("colima"),
+            "reason should name the backend: {reason}"
+        );
+
+        assert_eq!(r.phases[0].steps[1].status, Status::Passed);
+        assert_eq!(r.status, Status::Passed, "an honest skip is not a failure");
+    }
+
+    #[tokio::test]
+    async fn test_requires_env_runs_when_satisfied() {
+        let mut f = facts("lima");
+        f.kernel = Some((6, 6, 0));
+        f.btf = true;
+
+        let r = run_with_facts(NEEDS_NEW_KERNEL, Some(f)).await;
+        assert_eq!(r.phases[0].steps[0].status, Status::Passed);
+        assert_eq!(r.status, Status::Passed);
+    }
+
+    /// with no preflight (a plain `local|` run) the only requirement we can
+    /// honestly judge is the host one
+    #[tokio::test]
+    async fn test_host_conditional_skip_without_facts() {
+        let bp = format!(
+            r#"
+blueprint "T" {{
+    phase "t" {{
+        step "elsewhere" {{
+            requires {{ host: "definitely-not-{}" }}
+            probe exec echo "hello"
+            expect {{ exit: 0 }}
+        }}
+        step "here" {{
+            requires {{ host: "{}" }}
+            probe exec echo "hello"
+            expect {{ exit: 0 }}
+        }}
+    }}
+}}
+"#,
+            std::env::consts::OS,
+            std::env::consts::OS
+        );
+
+        let r = run_with_facts(&bp, None).await;
+        assert_eq!(r.phases[0].steps[0].status, Status::Skipped);
+        assert!(r.phases[0].steps[0].skip_reason.is_some());
+        assert_eq!(r.phases[0].steps[1].status, Status::Passed);
     }
 
     #[tokio::test]

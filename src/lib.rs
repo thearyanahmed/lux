@@ -2,6 +2,7 @@ pub mod api;
 pub mod auth;
 pub mod commands;
 pub mod config;
+pub mod env;
 pub mod message;
 pub mod projectfiles;
 pub mod runtime;

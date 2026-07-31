@@ -1,0 +1,59 @@
+# the pinned Lighthouse Linux environment.
+#
+# this is the contract books validate against — kernel >=6.1 with BTF and
+# CAP_BPF, identical on macOS and Linux. the host is an implementation detail.
+images:
+  - location: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img"
+    arch: "x86_64"
+  - location: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-arm64.img"
+    arch: "aarch64"
+
+cpus: 4
+memory: "4GiB"
+disk: "40GiB"
+
+# the workspace is bind-mounted per run by `docker run -v`; lima only needs to
+# be able to see the host paths those mounts come from
+mounts:
+  - location: "~"
+    writable: true
+
+containerd:
+  system: false
+  user: false
+
+provision:
+  - mode: system
+    script: |
+      #!/bin/bash
+      set -eux -o pipefail
+      command -v docker >/dev/null 2>&1 && exit 0
+      curl -fsSL https://get.docker.com | sh
+  - mode: system
+    script: |
+      #!/bin/bash
+      # cgroup v2 unified hierarchy is a hard requirement for the container and
+      # kubernetes books; fail loudly here rather than on a learner's first probe
+      set -eux -o pipefail
+      grep -q cgroup2 /proc/filesystems
+      test -d /sys/fs/cgroup/cgroup.controllers -o -f /sys/fs/cgroup/cgroup.controllers
+  - mode: system
+    script: |
+      #!/bin/bash
+      # BTF is what gates the eBPF book onto this environment
+      set -eux -o pipefail
+      test -f /sys/kernel/btf/vmlinux
+
+probes:
+  - description: "docker to be installed"
+    script: |
+      #!/bin/bash
+      set -eux -o pipefail
+      timeout 30s bash -c "until command -v docker >/dev/null 2>&1; do sleep 3; done"
+
+hostResolver:
+  enabled: true
+
+portForwards:
+  - guestSocket: "/var/run/docker.sock"
+    hostSocket: "{{.Dir}}/sock/docker.sock"

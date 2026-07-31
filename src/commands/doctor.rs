@@ -26,7 +26,7 @@ pub async fn run() -> Result<()> {
 
     // development tools
     UI::section("Development Tools");
-    check_dev_tools();
+    check_dev_tools().await;
 
     // active lab
     UI::section("Project State");
@@ -134,7 +134,7 @@ async fn check_network(config: &Option<Config>) {
     }
 }
 
-fn check_dev_tools() {
+async fn check_dev_tools() {
     let tools = vec![
         ToolCheck::new("git", &["--version"], true),
         ToolCheck::new("go", &["version"], false),
@@ -147,8 +147,23 @@ fn check_dev_tools() {
         tool.check();
     }
 
+    check_linux_backend().await;
+
     UI::blank();
     UI::note("supported runtimes: go, rust");
+}
+
+/// which backend `linux|` blueprints would run in. named here so `luxctl doctor`
+/// answers the question before a learner's first kernel probe does.
+async fn check_linux_backend() {
+    match crate::env::backend::detect().await {
+        Some(b) if b.kind.is_usable() => UI::ok("linux runner", Some(b.kind.as_str())),
+        Some(b) => UI::warn(
+            "linux runner",
+            Some(&format!("{} cannot run these probes", b.kind.as_str())),
+        ),
+        None => UI::skip("linux runner", Some("no backend — run `luxctl env up`")),
+    }
 }
 
 struct ToolCheck {
@@ -229,7 +244,10 @@ fn check_project_state(config: &Option<Config>) {
         if workspace_path.exists() {
             UI::ok("workspace", Some(&project.workspace));
         } else {
-            UI::error("workspace", Some(&format!("{} (not found)", project.workspace)));
+            UI::error(
+                "workspace",
+                Some(&format!("{} (not found)", project.workspace)),
+            );
         }
 
         if let Some(rt) = &project.runtime {

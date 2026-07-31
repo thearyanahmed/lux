@@ -82,10 +82,19 @@ impl CliReporter {
                 );
             }
             Status::Skipped => {
-                println!("  {} {}", "all steps skipped.".dimmed(), format!("({})", duration).dimmed());
+                println!(
+                    "  {} {}",
+                    "all steps skipped.".dimmed(),
+                    format!("({})", duration).dimmed()
+                );
             }
             Status::Error(msg) => {
-                println!("  {} {} {}", "error:".red().bold(), msg, format!("({})", duration).dimmed());
+                println!(
+                    "  {} {} {}",
+                    "error:".red().bold(),
+                    msg,
+                    format!("({})", duration).dimmed()
+                );
             }
         }
 
@@ -103,7 +112,14 @@ impl CliReporter {
                 if detailed {
                     let suffix = step_suffix(step);
                     let gap = right_align_gap(7 + step.name.len(), suffix.len());
-                    println!("  {} {} {}{}{}", prefix, "✓".green(), step.name, gap, suffix.dimmed());
+                    println!(
+                        "  {} {} {}{}{}",
+                        prefix,
+                        "✓".green(),
+                        step.name,
+                        gap,
+                        suffix.dimmed()
+                    );
                     print_expectations(&step.expectations);
                 } else {
                     println!("  {} {} {}", prefix, "✓".green(), step.name);
@@ -135,9 +151,18 @@ impl CliReporter {
             }
             Status::Skipped => {
                 println!("  {} {} {}", prefix, "⊘".dimmed(), step.name.dimmed());
+                if let Some(reason) = &step.skip_reason {
+                    println!("       {}", reason.dimmed());
+                }
             }
             Status::Error(msg) => {
-                println!("  {} {} {} — {}", prefix, "!".yellow(), step.name.yellow(), msg);
+                println!(
+                    "  {} {} {} — {}",
+                    prefix,
+                    "!".yellow(),
+                    step.name.yellow(),
+                    msg
+                );
             }
         }
 
@@ -282,6 +307,7 @@ mod tests {
                     input_matched: None,
                     duration_ms: 50,
                     retry_count: 0,
+                    skip_reason: None,
                 }],
                 duration_ms: 50,
             }],
@@ -329,6 +355,7 @@ mod tests {
                     input_matched: None,
                     duration_ms: 100,
                     retry_count: 0,
+                    skip_reason: None,
                 }],
                 duration_ms: 100,
             }],

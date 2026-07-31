@@ -7,11 +7,52 @@ use blueprint::executor::context::{Context, ExecutionMode};
 use blueprint::executor::Engine;
 use blueprint::parser::parse;
 use blueprint::reporter::format_api_payload;
-use blueprint::transpiler::ir::Value;
+use blueprint::transpiler::ir::{Blueprint, Value};
 use blueprint::transpiler::{transpile, BlueprintResult, Status};
 
 use crate::api::{SubmitAttemptRequest, Task, TaskOutcome};
+use crate::env::{preflight, RunnerImage, Session};
 use crate::runtime::SupportedRuntime;
+use crate::ui::UI;
+
+/// provision the environment a blueprint's `runner_image` asks for.
+///
+/// `local|` is what luxctl has always done, so it provisions nothing. `linux|`
+/// runs preflight and starts the pinned Linux environment. the returned session
+/// must be torn down by the caller once the engine is finished with it.
+async fn provision(
+    bp: &Blueprint,
+    task_slug: &str,
+    workspace: Option<&std::path::Path>,
+) -> Result<Option<Session>> {
+    let image = RunnerImage::parse(bp.meta.runner_image.as_deref());
+
+    if let RunnerImage::Retired(raw) = &image {
+        UI::warn(
+            "runner",
+            Some(&format!(
+                "'{raw}' is a retired hosted runner; running locally instead"
+            )),
+        );
+    }
+
+    if !image.is_linux() {
+        return Ok(None);
+    }
+
+    let reqs = bp.requires_env.as_ref();
+    let backend = preflight(reqs).await?;
+    let session = Session::start(backend, task_slug, workspace, bp.config.port, reqs).await?;
+    Ok(Some(session))
+}
+
+/// attach the session's runner and the facts `requires { }` is judged against
+fn apply_session(ctx: Context, session: Option<&Session>) -> Context {
+    match session {
+        Some(s) => ctx.with_runner(s.runner()).with_facts(s.facts()),
+        None => ctx,
+    }
+}
 
 /// which validation system a task uses
 pub enum TaskSystem<'a> {
@@ -72,7 +113,12 @@ pub async fn run_validate(
     })?;
     log::debug!("transpiled ok: {} phases", bp.phases.len());
 
-    let mut ctx = Context::new(bp.config.clone(), ExecutionMode::Validate);
+    let session = provision(&bp, task_slug, workspace.as_deref()).await?;
+
+    let mut ctx = apply_session(
+        Context::new(bp.config.clone(), ExecutionMode::Validate),
+        session.as_ref(),
+    );
     if let Some(ws) = workspace.clone() {
         ctx = ctx.with_workspace(ws);
     }
@@ -80,7 +126,10 @@ pub async fn run_validate(
         ctx.set_variable("$BIN", Value::String(bin.clone()));
     }
     if let Some(rt_str) = runtime {
-        let resolved_path = bp.config.bin_path.get(rt_str)
+        let resolved_path = bp
+            .config
+            .bin_path
+            .get(rt_str)
             .cloned()
             .or_else(|| bp.config.bin.as_ref().map(|b| format!("./{}", b)));
 
@@ -96,13 +145,15 @@ pub async fn run_validate(
     let mut engine = Engine::new(ctx).with_task(task_slug);
 
     log::debug!("executing engine...");
-    let result = engine
-        .execute(&bp)
-        .await
-        .wrap_err("blueprint execution failed")?;
+    let result = engine.execute(&bp).await;
     log::debug!("engine done");
 
-    Ok(result)
+    // tear down before propagating, so a failed run does not strand a container
+    if let Some(s) = session {
+        s.teardown().await;
+    }
+
+    result.wrap_err("blueprint execution failed")
 }
 
 /// run a blueprint in Result mode (with user inputs for input-matching steps)
@@ -124,7 +175,12 @@ pub async fn run_result(
         color_eyre::eyre::eyre!("transpile error: {}", msg)
     })?;
 
-    let mut ctx = Context::new(bp.config.clone(), ExecutionMode::Result);
+    let session = provision(&bp, task_slug, workspace.as_deref()).await?;
+
+    let mut ctx = apply_session(
+        Context::new(bp.config.clone(), ExecutionMode::Result),
+        session.as_ref(),
+    );
     if let Some(ws) = workspace {
         ctx = ctx.with_workspace(ws);
     }
@@ -132,7 +188,10 @@ pub async fn run_result(
         ctx.set_variable("$BIN", Value::String(bin.clone()));
     }
     if let Some(rt_str) = runtime {
-        let resolved_path = bp.config.bin_path.get(rt_str)
+        let resolved_path = bp
+            .config
+            .bin_path
+            .get(rt_str)
             .cloned()
             .or_else(|| bp.config.bin.as_ref().map(|b| format!("./{}", b)));
 
@@ -150,12 +209,13 @@ pub async fn run_result(
 
     let mut engine = Engine::new(ctx).with_task(task_slug);
 
-    let result = engine
-        .execute(&bp)
-        .await
-        .wrap_err("blueprint execution failed")?;
+    let result = engine.execute(&bp).await;
 
-    Ok(result)
+    if let Some(s) = session {
+        s.teardown().await;
+    }
+
+    result.wrap_err("blueprint execution failed")
 }
 
 /// convert a BlueprintResult into a SubmitAttemptRequest for the API
@@ -193,9 +253,9 @@ pub fn to_attempt_request(
 pub fn parse_inputs(raw: &[String]) -> Result<HashMap<String, String>> {
     let mut map = HashMap::new();
     for item in raw {
-        let (key, value) = item
-            .split_once('=')
-            .ok_or_else(|| color_eyre::eyre::eyre!("invalid input '{}': expected key=value", item))?;
+        let (key, value) = item.split_once('=').ok_or_else(|| {
+            color_eyre::eyre::eyre!("invalid input '{}': expected key=value", item)
+        })?;
         map.insert(key.to_string(), value.to_string());
     }
     Ok(map)
@@ -329,7 +389,9 @@ mod tests {
             file_path.display()
         );
 
-        let result = run_validate(&bp_source, "test-task", None, None).await.unwrap();
+        let result = run_validate(&bp_source, "test-task", None, None)
+            .await
+            .unwrap();
         assert!(matches!(result.status, Status::Passed));
     }
 
@@ -344,7 +406,9 @@ mod tests {
     }
 }"#;
 
-        let result = run_validate(bp_source, "test-task", None, None).await.unwrap();
+        let result = run_validate(bp_source, "test-task", None, None)
+            .await
+            .unwrap();
         assert!(matches!(result.status, Status::Failed));
     }
 

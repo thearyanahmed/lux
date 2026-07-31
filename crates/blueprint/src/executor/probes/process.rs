@@ -9,8 +9,14 @@ pub async fn execute(probe: &ProcessProbe, ctx: &Context) -> Result<ProbeResult,
     let name = ctx.interpolate(&probe.name);
     let start = Instant::now();
 
-    // use pgrep to find processes by name
-    let output = Command::new("pgrep").args(["-x", &name]).output().await;
+    // use pgrep to find processes by name — inside the guest in linux| mode,
+    // where the process the learner started actually lives
+    let (program, args, _) = ctx.runner.wrap("pgrep", &["-x".to_string(), name.clone()]);
+    let output = Command::new(&program)
+        .args(&args)
+        .envs(ctx.runner.env().iter().cloned())
+        .output()
+        .await;
 
     let duration = start.elapsed();
     let mut fields = HashMap::new();

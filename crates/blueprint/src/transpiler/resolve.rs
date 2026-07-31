@@ -7,6 +7,7 @@ pub fn transpile(ast: &crate::parser::ast::Ast) -> Result<Blueprint, TranspileEr
     meta.unlock_mode = "sequential".to_string();
     let mut config = Config::default();
     let mut phases = Vec::new();
+    let mut requires_env = None;
 
     for item in &ast.blueprint.items {
         match item {
@@ -14,6 +15,7 @@ pub fn transpile(ast: &crate::parser::ast::Ast) -> Result<Blueprint, TranspileEr
                 "config" => config = resolve_config(block)?,
                 "phase" => phases.push(resolve_phase(block)?),
                 "features" => meta.features = resolve_features(block)?,
+                "requires" => requires_env = Some(resolve_requires_block(block)),
                 _ => {}
             },
             crate::parser::ast::AstItem::Property(prop) => {
@@ -28,7 +30,82 @@ pub fn transpile(ast: &crate::parser::ast::Ast) -> Result<Blueprint, TranspileEr
         meta,
         config,
         phases,
+        requires_env,
     })
+}
+
+/// resolve a `requires { }` block.
+///
+/// every value is a plain scalar property — capabilities are a comma-separated
+/// string rather than a list literal, which keeps the lexer untouched.
+///
+/// ```text
+/// requires {
+///   kernel: ">=6.1"
+///   cgroup: "v2"
+///   userns: true
+///   btf: true
+///   cap: "SYS_ADMIN,BPF"
+///   host: "linux"
+/// }
+/// ```
+fn resolve_requires_block(block: &crate::parser::ast::Block) -> Requirements {
+    let mut reqs = Requirements::default();
+
+    for item in &block.items {
+        let prop = match item {
+            crate::parser::ast::AstItem::Property(p) => p,
+            _ => continue,
+        };
+        match prop.key.as_str() {
+            "kernel" => {
+                if let Some(s) = prop.value.as_str() {
+                    reqs.kernel = parse_version_triple(s);
+                }
+            }
+            "cgroup" => {
+                // accepts `cgroup: "v2"` or `cgroup: 2`
+                let v2 = prop
+                    .value
+                    .as_str()
+                    .map(|s| s.trim().trim_start_matches('v') == "2")
+                    .unwrap_or_else(|| prop.value.as_i64() == Some(2));
+                reqs.cgroup_v2 = v2;
+            }
+            "userns" => reqs.userns = prop.value.as_bool().unwrap_or(false),
+            "btf" => reqs.btf = prop.value.as_bool().unwrap_or(false),
+            "privileged" => reqs.privileged = prop.value.as_bool().unwrap_or(false),
+            "pid" => reqs.pid_host = prop.value.as_str() == Some("host"),
+            "cap" | "caps" => {
+                if let Some(s) = prop.value.as_str() {
+                    reqs.caps = s
+                        .split(',')
+                        .map(|c| c.trim().to_uppercase())
+                        .filter(|c| !c.is_empty())
+                        .collect();
+                }
+            }
+            "host" => reqs.host = prop.value.as_str().map(|s| s.trim().to_lowercase()),
+            _ => {}
+        }
+    }
+
+    reqs
+}
+
+/// parse the leading numeric triple out of a version constraint.
+///
+/// handles `">=6.1"`, `"6.1.0"`, and kernel strings like `"5.15.0-91-generic"`
+/// or `"6.1.0-rc1"`, none of which the semver parser in `upgrade.rs` accepts.
+pub(crate) fn parse_version_triple(s: &str) -> Option<(u64, u64, u64)> {
+    let digits = s
+        .trim()
+        .trim_start_matches(['>', '=', '<', '^', '~', 'v', ' ']);
+    let mut parts = digits.split(['.', '-', '_', '+']);
+    let major = parts.next()?.parse().ok()?;
+    let minor = parts.next().and_then(|p| p.parse().ok()).unwrap_or(0);
+    let patch = parts.next().and_then(|p| p.parse().ok()).unwrap_or(0);
+    Some((major, minor, patch))
 }
 
 fn resolve_config(block: &crate::parser::ast::Block) -> Result<Config, TranspileError> {
@@ -114,9 +191,7 @@ fn resolve_phase(block: &crate::parser::ast::Block) -> Result<Phase, TranspileEr
                 "points" => meta.points = p.value.as_i64().unwrap_or(0) as u32,
                 "scores" => meta.scores = p.value.as_str().map(|s| s.to_string()),
                 "is_free" => meta.is_free = p.value.as_bool().unwrap_or(false),
-                "visibility_level" => {
-                    meta.visibility_level = p.value.as_i64().unwrap_or(0) as u8
-                }
+                "visibility_level" => meta.visibility_level = p.value.as_i64().unwrap_or(0) as u8,
                 "abandoned_deduction" => {
                     meta.abandoned_deduction = p.value.as_i64().unwrap_or(0) as u32
                 }
@@ -142,6 +217,7 @@ fn resolve_step(block: &crate::parser::ast::Block) -> Result<Step, TranspileErro
 
     let mut meta = StepMeta::default();
     let mut requires = Vec::new();
+    let mut requires_env = None;
     let mut timeout = None;
     let mut retry = None;
     let mut inputs = Vec::new();
@@ -182,6 +258,9 @@ fn resolve_step(block: &crate::parser::ast::Block) -> Result<Step, TranspileErro
                 "headers" => {
                     headers = resolve_headers_block(b)?;
                 }
+                "requires" => {
+                    requires_env = Some(resolve_requires_block(b));
+                }
                 _ => {}
             },
             crate::parser::ast::AstItem::Line(line) => {
@@ -212,6 +291,7 @@ fn resolve_step(block: &crate::parser::ast::Block) -> Result<Step, TranspileErro
         name,
         meta,
         requires,
+        requires_env,
         timeout,
         retry,
         inputs,
@@ -869,6 +949,145 @@ mod tests {
     }
 
     #[test]
+    fn test_version_triple_handles_kernel_and_constraint_forms() {
+        assert_eq!(parse_version_triple(">=6.1"), Some((6, 1, 0)));
+        assert_eq!(parse_version_triple("6.1.0"), Some((6, 1, 0)));
+        assert_eq!(parse_version_triple("5.15.0-91-generic"), Some((5, 15, 0)));
+        assert_eq!(parse_version_triple("6.1.0-rc1"), Some((6, 1, 0)));
+        assert_eq!(parse_version_triple("nonsense"), None);
+    }
+
+    #[test]
+    fn test_top_level_requires_block() {
+        let bp = transpile_str(
+            r#"
+blueprint "Test" {
+    requires {
+        kernel: ">=6.1"
+        cgroup: "v2"
+        userns: true
+        btf: true
+        cap: "SYS_ADMIN, bpf"
+        host: "Linux"
+    }
+    phase "p" {
+        step "s" {
+            probe exec "true"
+            expect { exit: 0 }
+        }
+    }
+}
+"#,
+        )
+        .unwrap_or_else(|e| panic!("transpile: {e}"));
+
+        let r = bp.requires_env.unwrap_or_else(|| panic!("no requires_env"));
+        assert_eq!(r.kernel, Some((6, 1, 0)));
+        assert!(r.cgroup_v2);
+        assert!(r.userns);
+        assert!(r.btf);
+        assert_eq!(r.caps, vec!["SYS_ADMIN".to_string(), "BPF".to_string()]);
+        assert_eq!(r.host.as_deref(), Some("linux"));
+        assert!(!r.is_empty());
+    }
+
+    #[test]
+    fn test_step_level_requires_block() {
+        let bp = transpile_str(
+            r#"
+blueprint "Test" {
+    phase "p" {
+        step "s" {
+            requires { privileged: true  pid: "host"  cgroup: 2 }
+            probe exec "true"
+            expect { exit: 0 }
+        }
+    }
+}
+"#,
+        )
+        .unwrap_or_else(|e| panic!("transpile: {e}"));
+
+        let step = &bp.phases[0].steps[0];
+        let r = step
+            .requires_env
+            .as_ref()
+            .unwrap_or_else(|| panic!("no requires_env"));
+        assert!(r.privileged);
+        assert!(r.pid_host);
+        assert!(
+            r.cgroup_v2,
+            "cgroup: 2 should be accepted as well as \"v2\""
+        );
+        // the block form must not disturb the variable form
+        assert!(step.requires.is_empty());
+    }
+
+    /// `requires` is overloaded: a block means host capabilities, a property or
+    /// bare line means "skip unless this captured variable exists". both forms
+    /// have to keep working, and a blueprint may use both at once.
+    #[test]
+    fn test_requires_variable_forms_still_resolve() {
+        let bp = transpile_str(
+            r#"
+blueprint "Test" {
+    phase "p" {
+        step "property form" {
+            requires: "$TOKEN"
+            probe exec "true"
+            expect { exit: 0 }
+        }
+        step "line form" {
+            requires $SESSION
+            probe exec "true"
+            expect { exit: 0 }
+        }
+        step "both forms" {
+            requires: "$TOKEN"
+            requires { btf: true }
+            probe exec "true"
+            expect { exit: 0 }
+        }
+    }
+}
+"#,
+        )
+        .unwrap_or_else(|e| panic!("transpile: {e}"));
+
+        let steps = &bp.phases[0].steps;
+        assert_eq!(steps[0].requires, vec!["$TOKEN".to_string()]);
+        assert!(steps[0].requires_env.is_none());
+        assert_eq!(steps[1].requires, vec!["$SESSION".to_string()]);
+        assert!(steps[1].requires_env.is_none());
+
+        assert_eq!(steps[2].requires, vec!["$TOKEN".to_string()]);
+        assert!(steps[2]
+            .requires_env
+            .as_ref()
+            .map(|r| r.btf)
+            .unwrap_or(false));
+    }
+
+    #[test]
+    fn test_no_requires_block_leaves_none() {
+        let bp = transpile_str(
+            r#"
+blueprint "Test" {
+    phase "p" {
+        step "s" {
+            probe exec "true"
+            expect { exit: 0 }
+        }
+    }
+}
+"#,
+        )
+        .unwrap_or_else(|e| panic!("transpile: {e}"));
+        assert!(bp.requires_env.is_none());
+        assert!(bp.phases[0].steps[0].requires_env.is_none());
+    }
+
+    #[test]
     fn test_minimal_transpile() {
         let bp = transpile_str(
             r#"
@@ -1192,7 +1411,10 @@ blueprint "Test" {
         let phase = &bp.phases[0];
         assert_eq!(phase.meta.title.as_deref(), Some("Listen on Port"));
         assert_eq!(phase.meta.slug.as_deref(), Some("listen-on-port"));
-        assert_eq!(phase.meta.description.as_deref(), Some("Create a TCP server"));
+        assert_eq!(
+            phase.meta.description.as_deref(),
+            Some("Create a TCP server")
+        );
         assert_eq!(phase.meta.points, 25);
         assert_eq!(phase.meta.scores.as_deref(), Some("5:10:25|10:20:15"));
         assert_eq!(phase.meta.visibility_level, 3);
@@ -1320,9 +1542,18 @@ blueprint "T" {
         )
         .unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(bp.config.bin.as_deref(), Some("seachart"));
-        assert_eq!(bp.config.bin_path.get("go").map(|s| s.as_str()), Some("./seachart"));
-        assert_eq!(bp.config.bin_path.get("rust").map(|s| s.as_str()), Some("./target/debug/seachart"));
-        assert_eq!(bp.config.bin_path.get("c").map(|s| s.as_str()), Some("./seachart"));
+        assert_eq!(
+            bp.config.bin_path.get("go").map(|s| s.as_str()),
+            Some("./seachart")
+        );
+        assert_eq!(
+            bp.config.bin_path.get("rust").map(|s| s.as_str()),
+            Some("./target/debug/seachart")
+        );
+        assert_eq!(
+            bp.config.bin_path.get("c").map(|s| s.as_str()),
+            Some("./seachart")
+        );
     }
 
     #[test]

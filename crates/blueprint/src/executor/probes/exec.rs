@@ -34,10 +34,17 @@ pub async fn execute_with_timeout(
 
     let start = Instant::now();
 
-    let mut cmd = Command::new(&command);
-    cmd.args(&args);
-    if let Some(ref ws) = ctx.workspace {
-        cmd.current_dir(ws);
+    // in linux| mode this becomes `docker exec -w /workspace <container> <cmd>`;
+    // locally it is the command itself
+    let (program, wrapped_args, apply_cwd) = ctx.runner.wrap(&command, &args);
+
+    let mut cmd = Command::new(&program);
+    cmd.args(&wrapped_args);
+    cmd.envs(ctx.runner.env().iter().cloned());
+    if apply_cwd {
+        if let Some(ref ws) = ctx.workspace {
+            cmd.current_dir(ws);
+        }
     }
 
     // use step timeout, fall back to config timeout, or default 30s
@@ -152,7 +159,9 @@ mod tests {
         assert!(result.is_ok());
         let result = result.unwrap_or_else(|e| panic!("{e}"));
 
-        assert!(matches!(result.fields.get("stdout"), Some(Value::String(s)) if s == "hello world"));
+        assert!(
+            matches!(result.fields.get("stdout"), Some(Value::String(s)) if s == "hello world")
+        );
         assert!(matches!(result.fields.get("exit"), Some(Value::Int(0))));
     }
 

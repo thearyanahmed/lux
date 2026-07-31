@@ -95,6 +95,12 @@ enum Commands {
         action: TerminalAction,
     },
 
+    /// Manage the pinned Linux environment that `linux|` blueprints run in
+    Env {
+        #[command(subcommand)]
+        action: EnvAction,
+    },
+
     /// Download or refresh fixture files for the active project
     Sync,
 
@@ -243,6 +249,18 @@ enum TerminalAction {
     Status,
     /// Clear the active terminal
     Stop,
+}
+
+#[derive(Subcommand)]
+enum EnvAction {
+    /// See the detected backend and what it provides
+    Status,
+    /// Provision and start the pinned Lighthouse environment
+    Up,
+    /// Stop the pinned environment
+    Down,
+    /// Pull the current pinned image into the active backend
+    Upgrade,
 }
 
 impl Commands {
@@ -396,11 +414,22 @@ async fn main() -> Result<()> {
             }
         },
 
+        Commands::Env { action } => match action {
+            EnvAction::Status => commands::env::status().await?,
+            EnvAction::Up => commands::env::up().await?,
+            EnvAction::Down => commands::env::down().await?,
+            EnvAction::Upgrade => commands::env::upgrade().await?,
+        },
+
         Commands::Terminal { action } => match action {
             TerminalAction::List => {
                 commands::terminal::list().await?;
             }
-            TerminalAction::Start { slug, workspace, lang } => {
+            TerminalAction::Start {
+                slug,
+                workspace,
+                lang,
+            } => {
                 commands::terminal::start(&slug, &workspace, lang.as_deref())?;
             }
             TerminalAction::Run { detailed } => {
@@ -426,7 +455,11 @@ async fn main() -> Result<()> {
             commands::validate::validate_all(all, detailed).await?;
         }
 
-        Commands::Result { project, task, inputs } => {
+        Commands::Result {
+            project,
+            task,
+            inputs,
+        } => {
             commands::result::result(&task, &inputs, project.as_deref()).await?;
         }
 

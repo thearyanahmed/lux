@@ -11,6 +11,10 @@ pub struct Context {
     pub mode: ExecutionMode,
     /// working directory for exec probes (lab workspace path)
     pub workspace: Option<PathBuf>,
+    /// where probes execute — on the host, or inside the pinned Linux environment
+    pub runner: Runner,
+    /// what the host/backend actually supports, used to evaluate `requires { }`
+    pub facts: Option<HostFacts>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,6 +25,78 @@ pub enum ExecutionMode {
     Result,
 }
 
+/// where probes execute.
+///
+/// `Linux` carries an opaque command prefix supplied by the binary (something
+/// like `docker exec -w /workspace lux-<slug>`). The crate never learns what
+/// docker or lima are — it only knows how to put a command behind a prefix.
+#[derive(Debug, Clone, Default)]
+pub enum Runner {
+    #[default]
+    Local,
+    Linux {
+        prefix: Vec<String>,
+        env: Vec<(String, String)>,
+    },
+}
+
+impl Runner {
+    /// rewrite a command so it lands in the right place.
+    ///
+    /// returns `(program, args, apply_workspace_cwd)`. the cwd flag is false in
+    /// `Linux` mode because the prefix already carries the guest working
+    /// directory — setting a host cwd there would be meaningless.
+    pub fn wrap(&self, command: &str, args: &[String]) -> (String, Vec<String>, bool) {
+        match self {
+            Runner::Local => (command.to_string(), args.to_vec(), true),
+            Runner::Linux { prefix, .. } => match prefix.split_first() {
+                Some((program, rest)) => {
+                    let mut wrapped: Vec<String> = rest.to_vec();
+                    wrapped.push(command.to_string());
+                    wrapped.extend(args.iter().cloned());
+                    (program.clone(), wrapped, false)
+                }
+                // an empty prefix is a caller bug, not a reason to panic
+                None => (command.to_string(), args.to_vec(), true),
+            },
+        }
+    }
+
+    /// wrap a `sh -c` script. arguments are passed through argv rather than
+    /// interpolated into the script, so a path never becomes shell syntax.
+    pub fn wrap_shell(&self, script: &str, args: &[String]) -> (String, Vec<String>, bool) {
+        let mut sh_args = vec!["-c".to_string(), script.to_string(), "sh".to_string()];
+        sh_args.extend(args.iter().cloned());
+        self.wrap("sh", &sh_args)
+    }
+
+    pub fn env(&self) -> &[(String, String)] {
+        match self {
+            Runner::Local => &[],
+            Runner::Linux { env, .. } => env,
+        }
+    }
+
+    pub fn is_local(&self) -> bool {
+        matches!(self, Runner::Local)
+    }
+}
+
+/// what the selected backend actually provides. populated by the binary's
+/// preflight; `requires { }` is evaluated against it.
+#[derive(Debug, Clone, Default)]
+pub struct HostFacts {
+    /// host OS as reported by `std::env::consts::OS`
+    pub host_os: String,
+    /// human name of the selected backend, e.g. "colima"
+    pub backend: String,
+    /// guest kernel version triple
+    pub kernel: Option<(u64, u64, u64)>,
+    pub cgroup_v2: bool,
+    pub userns: bool,
+    pub btf: bool,
+}
+
 impl Context {
     pub fn new(config: Config, mode: ExecutionMode) -> Self {
         Self {
@@ -29,11 +105,23 @@ impl Context {
             user_inputs: HashMap::new(),
             mode,
             workspace: None,
+            runner: Runner::Local,
+            facts: None,
         }
     }
 
     pub fn with_workspace(mut self, path: PathBuf) -> Self {
         self.workspace = Some(path);
+        self
+    }
+
+    pub fn with_runner(mut self, runner: Runner) -> Self {
+        self.runner = runner;
+        self
+    }
+
+    pub fn with_facts(mut self, facts: HostFacts) -> Self {
+        self.facts = Some(facts);
         self
     }
 

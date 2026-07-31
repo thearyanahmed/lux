@@ -10,6 +10,34 @@ pub struct Blueprint {
     pub meta: ProjectMeta,
     pub config: Config,
     pub phases: Vec<Phase>,
+    /// top-level `requires { }` — drives provisioning and preflight
+    #[serde(default)]
+    pub requires_env: Option<Requirements>,
+}
+
+/// host and backend capabilities declared by a `requires { }` block.
+///
+/// a blueprint says what it needs; luxctl translates that per backend, so the
+/// blueprint never names docker flags or a specific host.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Requirements {
+    /// minimum kernel version, parsed from e.g. `">=6.1"`
+    pub kernel: Option<(u64, u64, u64)>,
+    pub cgroup_v2: bool,
+    pub userns: bool,
+    pub btf: bool,
+    pub privileged: bool,
+    pub pid_host: bool,
+    pub caps: Vec<String>,
+    /// host-conditional — only run when the host OS matches. this is what makes
+    /// cases like native driver-mode XDP skip honestly instead of failing.
+    pub host: Option<String>,
+}
+
+impl Requirements {
+    pub fn is_empty(&self) -> bool {
+        self == &Requirements::default()
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -89,7 +117,12 @@ pub struct PhaseMeta {
 pub struct Step {
     pub name: String,
     pub meta: StepMeta,
+    /// `requires: $var` — skip unless this captured variable exists.
+    /// distinct from `requires_env`, which is about host capabilities.
     pub requires: Vec<String>,
+    /// step-level `requires { }` — decides skip-with-reason versus fail
+    #[serde(default)]
+    pub requires_env: Option<Requirements>,
     #[serde(with = "option_duration_serde")]
     pub timeout: Option<Duration>,
     pub retry: Option<RetryConfig>,
@@ -389,6 +422,10 @@ pub struct StepResult {
     pub input_matched: Option<bool>,
     pub duration_ms: u64,
     pub retry_count: u32,
+    /// why this step was skipped. `Status::Skipped` carries no payload and is
+    /// matched in too many places to widen, so the reason rides alongside it.
+    #[serde(default)]
+    pub skip_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

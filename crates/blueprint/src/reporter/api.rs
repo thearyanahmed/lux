@@ -30,7 +30,10 @@ pub fn format_api_payload(result: &BlueprintResult, task_id: Option<&str>) -> Ap
 
     for phase in &result.phases {
         for step in &phase.steps {
-            if step.status == Status::Skipped {
+            // steps skipped by execution mode carry no reason and are noise.
+            // a skip *with* a reason is a real result — a host-conditional probe
+            // that could not run — and the backend has to see it.
+            if step.status == Status::Skipped && step.skip_reason.is_none() {
                 continue;
             }
 
@@ -39,11 +42,12 @@ pub fn format_api_payload(result: &BlueprintResult, task_id: Option<&str>) -> Ap
                 step_captured.insert(k.clone(), v.to_string());
             }
 
-            let message = step
-                .expectations
-                .iter()
-                .find(|e| e.status == Status::Failed)
-                .and_then(|e| e.message.clone());
+            let message = step.skip_reason.clone().or_else(|| {
+                step.expectations
+                    .iter()
+                    .find(|e| e.status == Status::Failed)
+                    .and_then(|e| e.message.clone())
+            });
 
             all_steps.push(ApiStepPayload {
                 name: step.name.clone(),
@@ -107,6 +111,7 @@ mod tests {
                     input_matched: None,
                     duration_ms: 50,
                     retry_count: 0,
+                    skip_reason: None,
                 }],
                 duration_ms: 50,
             }],
@@ -154,6 +159,7 @@ mod tests {
                     input_matched: Some(false),
                     duration_ms: 80,
                     retry_count: 0,
+                    skip_reason: None,
                 }],
                 duration_ms: 80,
             }],
@@ -190,6 +196,7 @@ mod tests {
                         input_matched: None,
                         duration_ms: 50,
                         retry_count: 0,
+                        skip_reason: None,
                     },
                     StepResult {
                         name: "skipped".to_string(),
@@ -199,6 +206,7 @@ mod tests {
                         input_matched: None,
                         duration_ms: 0,
                         retry_count: 0,
+                        skip_reason: None,
                     },
                 ],
                 duration_ms: 50,
@@ -210,5 +218,57 @@ mod tests {
 
         let payload = format_api_payload(&result, None);
         assert_eq!(payload.steps.len(), 1);
+    }
+
+    /// a host-conditional probe that could not run is a real result. dropping it
+    /// would make the backend see a shorter, quietly incomplete run.
+    #[test]
+    fn test_skipped_with_reason_is_reported() {
+        let reason = "requires a linux host, this is macos";
+        let result = BlueprintResult {
+            name: "Test".to_string(),
+            status: Status::Passed,
+            phases: vec![PhaseResult {
+                name: "test".to_string(),
+                slug: None,
+                status: Status::Passed,
+                steps: vec![
+                    StepResult {
+                        name: "mode skip".to_string(),
+                        status: Status::Skipped,
+                        expectations: Vec::new(),
+                        captures: Vec::new(),
+                        input_matched: None,
+                        duration_ms: 0,
+                        retry_count: 0,
+                        skip_reason: None,
+                    },
+                    StepResult {
+                        name: "native xdp".to_string(),
+                        status: Status::Skipped,
+                        expectations: Vec::new(),
+                        captures: Vec::new(),
+                        input_matched: None,
+                        duration_ms: 0,
+                        retry_count: 0,
+                        skip_reason: Some(reason.to_string()),
+                    },
+                ],
+                duration_ms: 0,
+            }],
+            duration_ms: 0,
+            captured: HashMap::new(),
+            input_provided: HashMap::new(),
+        };
+
+        let payload = format_api_payload(&result, None);
+        assert_eq!(
+            payload.steps.len(),
+            1,
+            "only the reasonless skip is dropped"
+        );
+        assert_eq!(payload.steps[0].name, "native xdp");
+        assert_eq!(payload.steps[0].status, "skipped");
+        assert_eq!(payload.steps[0].message.as_deref(), Some(reason));
     }
 }
