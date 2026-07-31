@@ -61,7 +61,7 @@ jobs:
 
       - name: Run tests
         if: steps.check_release.outputs.exists == 'false'
-        run: cargo test
+        run: cargo test --workspace
 
       - name: Verify version matches tag
         if: steps.check_release.outputs.exists == 'false'

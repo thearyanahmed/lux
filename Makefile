@@ -36,8 +36,10 @@ run:
 	cargo run
 
 # Run tests
+# --workspace is required: without it cargo only tests the root package, and the
+# blueprint crate's parser/transpiler/executor tests never run.
 test:
-	cargo test
+	cargo test --workspace
 
 # Run E2E tests (requires local API running)
 e2e:
@@ -53,7 +55,7 @@ fmt-check:
 
 # Run clippy lints
 lint:
-	cargo clippy
+	cargo clippy --workspace
 
 # Run clippy and auto-fix what it can
 fix:
