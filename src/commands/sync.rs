@@ -48,7 +48,7 @@ pub async fn run() -> Result<()> {
             UI::success("fixtures synced");
         }
         Ok(false) => {
-            UI::info("no fixtures available for this project");
+            // download_fixtures already printed why
         }
         Err(e) => {
             UI::error("failed to sync fixtures", Some(&format!("{}", e)));

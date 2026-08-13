@@ -1,3 +1,4 @@
+use crate::ui::UI;
 use color_eyre::eyre::{Result, WrapErr};
 use std::io::Read;
 use std::path::Path;
@@ -25,16 +26,25 @@ pub async fn download_fixtures(project_slug: &str, workspace: &Path) -> Result<b
     let response = match client.get(&url).send().await {
         Ok(r) => r,
         Err(e) => {
-            log::debug!("failed to fetch fixtures for '{}': {}", project_slug, e);
+            UI::warn(
+                &format!("could not download project files for '{}'", project_slug),
+                Some(&format!("{}", e)),
+            );
+            UI::note("retry with `luxctl sync` once you are back online");
             return Ok(false);
         }
     };
 
     if !response.status().is_success() {
-        log::debug!(
-            "no fixtures for '{}' (HTTP {})",
-            project_slug,
-            response.status()
+        // a 404 means the project has no fixture branch. that is normal for
+        // projects that ship no files, but it also happens when a branch is
+        // named wrong — so say it out loud instead of failing tasks silently.
+        UI::warn(
+            &format!("no project files downloaded for '{}'", project_slug),
+            Some(&format!("HTTP {}", response.status().as_u16())),
+        );
+        UI::note(
+            "if this project's tasks reference files like ./logs/ or ./data/, report this — the files are missing, not your solution",
         );
         return Ok(false);
     }
