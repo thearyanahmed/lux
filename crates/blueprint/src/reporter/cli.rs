@@ -138,6 +138,7 @@ impl CliReporter {
                         suffix.dimmed()
                     );
                     print_expectations(&step.expectations);
+                    print_output(step);
                 } else {
                     println!("  {} {} {}", prefix, "✗".red(), step.name.red());
                     for exp in &step.expectations {
@@ -147,6 +148,7 @@ impl CliReporter {
                             }
                         }
                     }
+                    print_output(step);
                 }
             }
             Status::Skipped => {
@@ -256,6 +258,20 @@ fn format_expectation_desc(exp: &ExpectResult) -> String {
     }
 }
 
+/// show what the probe printed when a step fails. a `diff` probe names the exact
+/// mismatching lines here, which is the difference between "exit 1" and knowing
+/// what to change.
+fn print_output(step: &StepResult) {
+    let Some(output) = &step.output else {
+        return;
+    };
+
+    println!("       {}", "probe output:".dimmed());
+    for line in output.lines() {
+        println!("         {}", line.dimmed());
+    }
+}
+
 fn print_expectations(expectations: &[ExpectResult]) {
     for exp in expectations {
         let desc = format_expectation_desc(exp);
@@ -308,6 +324,7 @@ mod tests {
                     duration_ms: 50,
                     retry_count: 0,
                     skip_reason: None,
+                    output: None,
                 }],
                 duration_ms: 50,
             }],
@@ -356,6 +373,7 @@ mod tests {
                     duration_ms: 100,
                     retry_count: 0,
                     skip_reason: None,
+                    output: None,
                 }],
                 duration_ms: 100,
             }],

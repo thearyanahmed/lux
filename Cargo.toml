@@ -3,7 +3,7 @@ members = [".", "crates/blueprint"]
 
 [package]
 name = "luxctl"
-version = "0.14.1"
+version = "0.14.2"
 edition = "2021"
 description = "Learn by building - CLI for projectlighthouse.io"
 license = "AGPL-3.0-only"
@@ -14,7 +14,7 @@ categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
 
 [dependencies]
-blueprint = { version = "0.3.0", path = "crates/blueprint", package = "lux-blueprint" }
+blueprint = { version = "0.4.0", path = "crates/blueprint", package = "lux-blueprint" }
 tokio = { version = "1.42", features = ["full"] }
 once_cell = "1.20"
 clap = { version = "4.5.52", features = ["derive"] }

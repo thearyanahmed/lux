@@ -195,6 +195,7 @@ impl Engine {
             duration_ms: 0,
             retry_count: max_attempts,
             skip_reason: None,
+            output: None,
         }))
     }
 
@@ -227,6 +228,7 @@ impl Engine {
                         duration_ms: start.elapsed().as_millis() as u64,
                         retry_count: attempt,
                         skip_reason: None,
+                        output: None,
                     });
                 }
             }
@@ -268,13 +270,22 @@ impl Engine {
 
         let all_passed = expect_results.iter().all(|r| r.status == Status::Passed);
         let input_ok = input_matched.unwrap_or(true);
+        let failed = !(all_passed && input_ok);
+
+        // only carried on failure — on success it is noise, and probe output can
+        // be large
+        let output = if failed {
+            probe_output(&probe_result)
+        } else {
+            None
+        };
 
         Ok(StepResult {
             name: step.name.clone(),
-            status: if all_passed && input_ok {
-                Status::Passed
-            } else {
+            status: if failed {
                 Status::Failed
+            } else {
+                Status::Passed
             },
             expectations: expect_results,
             captures: captured,
@@ -282,6 +293,7 @@ impl Engine {
             duration_ms: start.elapsed().as_millis() as u64,
             retry_count: attempt,
             skip_reason: None,
+            output,
         })
     }
 }
@@ -296,7 +308,26 @@ fn skipped_step(name: &str, reason: Option<String>) -> StepResult {
         duration_ms: 0,
         retry_count: 0,
         skip_reason: reason,
+        output: None,
     }
+}
+
+/// stdout from a failed probe, falling back to stderr, trimmed and capped.
+fn probe_output(result: &ProbeResult) -> Option<String> {
+    const MAX_LEN: usize = 800;
+
+    let pick = |key: &str| match result.fields.get(key) {
+        Some(Value::String(s)) if !s.trim().is_empty() => Some(s.trim().to_string()),
+        _ => None,
+    };
+
+    let text = pick("stdout").or_else(|| pick("stderr"))?;
+
+    Some(if text.len() > MAX_LEN {
+        format!("{}\n… output truncated", &text[..MAX_LEN])
+    } else {
+        text
+    })
 }
 
 /// check declared requirements against what the backend actually provides.
@@ -368,6 +399,74 @@ mod tests {
             .execute(&bp)
             .await
             .unwrap_or_else(|e| panic!("execute: {e}"))
+    }
+
+    #[tokio::test]
+    async fn test_failed_step_keeps_probe_output() {
+        // a diff probe writes the mismatch to stdout; without it the learner only
+        // ever sees the exit code
+        let r = run_bp(
+            r#"
+blueprint "T" {
+    phase "t" {
+        step "mismatch" {
+            probe exec sh -c "echo 'line differs'; exit 1"
+            expect { exit: 0 }
+        }
+    }
+}
+"#,
+            ExecutionMode::Validate,
+        )
+        .await;
+
+        let step = &r.phases[0].steps[0];
+        assert_eq!(step.status, Status::Failed);
+        assert_eq!(step.output.as_deref(), Some("line differs"));
+    }
+
+    #[tokio::test]
+    async fn test_passing_step_carries_no_output() {
+        let r = run_bp(
+            r#"
+blueprint "T" {
+    phase "t" {
+        step "fine" {
+            probe exec echo noise
+            expect { exit: 0 }
+        }
+    }
+}
+"#,
+            ExecutionMode::Validate,
+        )
+        .await;
+
+        let step = &r.phases[0].steps[0];
+        assert_eq!(step.status, Status::Passed);
+        assert!(step.output.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_failed_step_falls_back_to_stderr() {
+        let r = run_bp(
+            r#"
+blueprint "T" {
+    phase "t" {
+        step "stderr only" {
+            probe exec sh -c "echo 'boom' >&2; exit 1"
+            expect { exit: 0 }
+        }
+    }
+}
+"#,
+            ExecutionMode::Validate,
+        )
+        .await;
+
+        let step = &r.phases[0].steps[0];
+        assert_eq!(step.status, Status::Failed);
+        assert_eq!(step.output.as_deref(), Some("boom"));
     }
 
     #[tokio::test]

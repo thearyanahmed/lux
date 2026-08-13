@@ -426,6 +426,11 @@ pub struct StepResult {
     /// matched in too many places to widen, so the reason rides alongside it.
     #[serde(default)]
     pub skip_reason: Option<String>,
+    /// what the probe printed, kept only for failed steps. a `diff` probe writes
+    /// the mismatching lines to stdout; without this the learner sees an exit
+    /// code and nothing else.
+    #[serde(default)]
+    pub output: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
