@@ -104,7 +104,9 @@ pub struct ProjectState {
 impl ProjectState {
     /// create empty state
     pub fn new() -> Self {
-        ProjectState { active_project: None }
+        ProjectState {
+            active_project: None,
+        }
     }
 
     /// load state from disk, verifying integrity with HMAC

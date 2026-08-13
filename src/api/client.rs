@@ -316,7 +316,9 @@ impl LighthouseAPIClientBaseURL {
     pub fn from(base_url: &str, environment: Env) -> Result<Self, String> {
         let pattern = match environment {
             // DEV: allow localhost, 127.0.0.1, 0.0.0.0, or host.docker.internal (http or https, any port)
-            Env::DEV => r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0|host\.docker\.internal)(:\d+)?(/.*)?$",
+            Env::DEV => {
+                r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0|host\.docker\.internal)(:\d+)?(/.*)?$"
+            }
             // RELEASE: only allow https://*projectlighthouse.io
             Env::RELEASE => r"^https://([a-zA-Z0-9-]+\.)*projectlighthouse\.io(/.*)?$",
         };

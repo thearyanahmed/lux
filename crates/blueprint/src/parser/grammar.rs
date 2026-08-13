@@ -1059,7 +1059,10 @@ blueprint "T" {
             None
         });
         assert!(timeout_prop.is_some());
-        assert_eq!(timeout_prop.map(|p| &p.value), Some(&PropertyValue::String("10s".into())));
+        assert_eq!(
+            timeout_prop.map(|p| &p.value),
+            Some(&PropertyValue::String("10s".into()))
+        );
     }
 
     #[test]

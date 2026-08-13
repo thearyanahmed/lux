@@ -113,9 +113,8 @@ pub async fn run(version: Option<String>) -> Result<()> {
 
     // determine asset + download URL
     let asset = asset_name()?;
-    let download_url = format!(
-        "https://github.com/{GITHUB_REPO}/releases/download/{target_tag}/{asset}"
-    );
+    let download_url =
+        format!("https://github.com/{GITHUB_REPO}/releases/download/{target_tag}/{asset}");
 
     // download the tarball
     let client = reqwest::Client::new();
@@ -151,14 +150,13 @@ pub async fn run(version: Option<String>) -> Result<()> {
             .to_path_buf();
 
         // the binary is the entry whose name starts with "luxctl"
-        let name = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("");
+        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
         if name.starts_with("luxctl") && !name.ends_with(".tar.gz") {
             let mut buf = Vec::new();
-            entry.read_to_end(&mut buf).wrap_err("failed to read binary from tarball")?;
+            entry
+                .read_to_end(&mut buf)
+                .wrap_err("failed to read binary from tarball")?;
             binary_data = Some(buf);
             break;
         }
@@ -170,9 +168,10 @@ pub async fn run(version: Option<String>) -> Result<()> {
     };
 
     // locate current binary and write new one atomically
-    let current_exe = std::env::current_exe().wrap_err("could not determine current binary path")?;
-    let current_exe = fs::canonicalize(&current_exe)
-        .wrap_err("could not resolve current binary path")?;
+    let current_exe =
+        std::env::current_exe().wrap_err("could not determine current binary path")?;
+    let current_exe =
+        fs::canonicalize(&current_exe).wrap_err("could not resolve current binary path")?;
 
     let parent = current_exe
         .parent()

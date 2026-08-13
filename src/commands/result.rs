@@ -72,8 +72,14 @@ pub async fn result(task_id: &str, inputs: &[String], project_slug: Option<&str>
     };
 
     if !task_data.has_blueprint() {
-        oops!("task '{}' has no blueprint — `result` only works with blueprint tasks", task_data.slug);
-        say!("use `luxctl run --task {}` for legacy validator tasks", task_data.slug);
+        oops!(
+            "task '{}' has no blueprint — `result` only works with blueprint tasks",
+            task_data.slug
+        );
+        say!(
+            "use `luxctl run --task {}` for legacy validator tasks",
+            task_data.slug
+        );
         return Ok(());
     }
 
@@ -105,16 +111,21 @@ pub async fn result(task_id: &str, inputs: &[String], project_slug: Option<&str>
 
     ui.step("Running blueprint (result mode)...");
 
-    let bp_result =
-        match blueprint_runner::run_result(bp_source, &task_data.slug, &user_inputs, workspace, runtime.as_deref())
-            .await
-        {
-            Ok(r) => r,
-            Err(err) => {
-                oops!("blueprint failed: {}", err);
-                return Ok(());
-            }
-        };
+    let bp_result = match blueprint_runner::run_result(
+        bp_source,
+        &task_data.slug,
+        &user_inputs,
+        workspace,
+        runtime.as_deref(),
+    )
+    .await
+    {
+        Ok(r) => r,
+        Err(err) => {
+            oops!("blueprint failed: {}", err);
+            return Ok(());
+        }
+    };
 
     // submit before printing so we can show XP on the summary line
     let attempt_request =

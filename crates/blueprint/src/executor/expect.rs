@@ -208,12 +208,8 @@ fn value_eq(actual: &Value, expected: &ExpectedValue) -> bool {
     match (actual, expected) {
         (Value::Int(a), ExpectedValue::Int(b)) => a == b,
         (Value::String(a), ExpectedValue::Str(b)) => a.trim() == b.trim(),
-        (Value::String(a), ExpectedValue::Int(b)) => {
-            a.trim().parse::<i64>() == Ok(*b)
-        }
-        (Value::Int(a), ExpectedValue::Str(b)) => {
-            b.trim().parse::<i64>() == Ok(*a)
-        }
+        (Value::String(a), ExpectedValue::Int(b)) => a.trim().parse::<i64>() == Ok(*b),
+        (Value::Int(a), ExpectedValue::Str(b)) => b.trim().parse::<i64>() == Ok(*a),
         (Value::Bool(a), ExpectedValue::Bool(b)) => a == b,
         (Value::String(a), ExpectedValue::Bool(b)) => match a.trim() {
             "true" => *b,

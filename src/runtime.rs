@@ -62,7 +62,11 @@ impl SupportedRuntime {
 
     /// all supported runtimes
     pub fn all() -> &'static [SupportedRuntime] {
-        &[SupportedRuntime::Go, SupportedRuntime::Rust, SupportedRuntime::C]
+        &[
+            SupportedRuntime::Go,
+            SupportedRuntime::Rust,
+            SupportedRuntime::C,
+        ]
     }
 
     /// detect runtime from workspace directory by checking for module files
@@ -102,7 +106,10 @@ impl FromStr for SupportedRuntime {
             "go" | "golang" => Ok(SupportedRuntime::Go),
             "rust" | "rs" => Ok(SupportedRuntime::Rust),
             "c" => Ok(SupportedRuntime::C),
-            _ => Err(format!("unsupported runtime '{}'. supported: go, rust, c", s)),
+            _ => Err(format!(
+                "unsupported runtime '{}'. supported: go, rust, c",
+                s
+            )),
         }
     }
 }

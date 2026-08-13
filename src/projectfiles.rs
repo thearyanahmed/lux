@@ -147,8 +147,7 @@ mod tests {
             ],
         );
 
-        extract_archive(&archive, "test-project", tmp.path())
-            .unwrap_or_else(|e| panic!("{e}"));
+        extract_archive(&archive, "test-project", tmp.path()).unwrap_or_else(|e| panic!("{e}"));
 
         let log_path = tmp.path().join("logs/auth.log");
         assert!(log_path.exists());
@@ -162,14 +161,10 @@ mod tests {
     #[test]
     fn test_extract_archive_ignores_wrong_prefix() {
         let tmp = tempfile::TempDir::new().unwrap_or_else(|e| panic!("{e}"));
-        let archive = make_test_archive(
-            "other-project",
-            &[("logs/auth.log", b"data\n")],
-        );
+        let archive = make_test_archive("other-project", &[("logs/auth.log", b"data\n")]);
 
         // extracting with wrong slug should create nothing
-        extract_archive(&archive, "wrong-slug", tmp.path())
-            .unwrap_or_else(|e| panic!("{e}"));
+        extract_archive(&archive, "wrong-slug", tmp.path()).unwrap_or_else(|e| panic!("{e}"));
 
         assert!(!tmp.path().join("logs/auth.log").exists());
     }

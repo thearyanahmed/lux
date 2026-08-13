@@ -38,10 +38,7 @@ pub async fn run() -> Result<()> {
         return Ok(());
     }
 
-    UI::info(&format!(
-        "syncing fixtures for '{}'...",
-        project.slug
-    ));
+    UI::info(&format!("syncing fixtures for '{}'...", project.slug));
 
     match projectfiles::download_fixtures(&project.slug, &workspace).await {
         Ok(true) => {

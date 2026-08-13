@@ -121,8 +121,18 @@ pub async fn run_task_validators(
 ) -> Result<()> {
     match blueprint_runner::detect_system(task) {
         TaskSystem::Blueprint(source) => {
-            run_blueprint_task(client, project_slug, task, source, state_ctx, workspace, detailed, completed_slugs, runtime)
-                .await
+            run_blueprint_task(
+                client,
+                project_slug,
+                task,
+                source,
+                state_ctx,
+                workspace,
+                detailed,
+                completed_slugs,
+                runtime,
+            )
+            .await
         }
         TaskSystem::None => {
             let ui = RunUI::new(&task.slug, 0);
@@ -175,14 +185,15 @@ async fn run_blueprint_task(
 
     ui.step("Running blueprint...");
 
-    let bp_result = match blueprint_runner::run_validate(bp_source, &task.slug, workspace, runtime).await {
-        Ok(r) => r,
-        Err(err) => {
-            oops!("blueprint failed: {}", err);
-            run_epilogue(&ui, &task.epilogue).await;
-            return Ok(());
-        }
-    };
+    let bp_result =
+        match blueprint_runner::run_validate(bp_source, &task.slug, workspace, runtime).await {
+            Ok(r) => r,
+            Err(err) => {
+                oops!("blueprint failed: {}", err);
+                run_epilogue(&ui, &task.epilogue).await;
+                return Ok(());
+            }
+        };
 
     // submit before printing so we can show XP on the summary line
     let attempt_request = blueprint_runner::to_attempt_request(&bp_result, project_slug, task.id);
@@ -240,7 +251,12 @@ pub async fn submit_and_update(
 /// run a terminal: inject test_files → run blueprint → clean up.
 /// test files are written to workspace just before execution and removed after,
 /// preventing users from reading them to cheat.
-pub async fn run_terminal(terminal: &Terminal, workspace: &Path, lang: Option<&str>, detailed: bool) -> Result<()> {
+pub async fn run_terminal(
+    terminal: &Terminal,
+    workspace: &Path,
+    lang: Option<&str>,
+    detailed: bool,
+) -> Result<()> {
     let ui = RunUI::new(&terminal.slug, 0);
     ui.header();
     ui.blank_line();
@@ -258,7 +274,13 @@ pub async fn run_terminal(terminal: &Terminal, workspace: &Path, lang: Option<&s
 
     ui.step("Running blueprint...");
 
-    let bp_result = blueprint_runner::run_validate(bp_source, &terminal.slug, Some(workspace.to_path_buf()), None).await;
+    let bp_result = blueprint_runner::run_validate(
+        bp_source,
+        &terminal.slug,
+        Some(workspace.to_path_buf()),
+        None,
+    )
+    .await;
 
     // always clean up test files, even if blueprint failed
     cleanup_test_files(&written_paths);
@@ -279,8 +301,12 @@ fn write_test_files(workspace: &Path, files: &HashMap<String, String>) -> Result
         let target = workspace.join(relative_path);
 
         if let Some(parent) = target.parent() {
-            std::fs::create_dir_all(parent)
-                .wrap_err_with(|| format!("failed to create directory for test file: {}", parent.display()))?;
+            std::fs::create_dir_all(parent).wrap_err_with(|| {
+                format!(
+                    "failed to create directory for test file: {}",
+                    parent.display()
+                )
+            })?;
         }
 
         std::fs::write(&target, content)
@@ -419,7 +445,10 @@ mod tests {
     fn test_write_test_files_creates_files() {
         let dir = tempfile::tempdir().unwrap();
         let mut files = HashMap::new();
-        files.insert("lru-cache/lru_cache_test.go".to_string(), "package lru_cache\n".to_string());
+        files.insert(
+            "lru-cache/lru_cache_test.go".to_string(),
+            "package lru_cache\n".to_string(),
+        );
 
         let written = write_test_files(dir.path(), &files).unwrap();
 
